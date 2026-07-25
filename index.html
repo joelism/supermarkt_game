@@ -1,0 +1,1902 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#23303a">
+<title>Märt-Tycoon</title>
+<style>
+:root{
+  --bg:#eef0ee; --panel:#ffffff; --ink:#23303a; --ink-soft:#5b6b76;
+  --accent:#ff7a00; --accent-dark:#d96600; --green:#1f8a4d; --red:#d33a2f;
+  --radius:14px; --shadow:0 4px 14px rgba(35,48,58,.12);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+input{user-select:text;-webkit-user-select:text}
+html,body{height:100%;overscroll-behavior:none}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  background:var(--bg);color:var(--ink);
+  display:flex;flex-direction:column;height:100dvh;
+  user-select:none;-webkit-user-select:none;touch-action:manipulation;
+}
+#topbar{
+  background:var(--ink);color:#fff;
+  padding:calc(env(safe-area-inset-top) + 8px) 12px 8px;
+  display:flex;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0;
+}
+#topbar .money{font-size:19px;font-weight:800;color:#ffd28f}
+#topbar .mid{text-align:center;line-height:1.15}
+#topbar .day{font-size:13px;font-weight:700}
+#topbar .clock{font-size:11.5px;color:#b9c6cf}
+#topbar .clean{font-size:12px;text-align:right;line-height:1.2}
+.cleanbar{width:64px;height:6px;background:#3b4b58;border-radius:3px;overflow:hidden;margin-top:3px;margin-left:auto}
+.cleanbar>i{display:block;height:100%;background:var(--green);border-radius:3px;transition:width .4s}
+#stage{flex:1;position:relative;overflow:hidden;background:#7fae70}
+canvas{display:block;touch-action:none;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
+#zoomBtn{
+  position:absolute;right:10px;bottom:10px;z-index:5;
+  width:44px;height:44px;border-radius:50%;border:0;
+  background:rgba(35,48,58,.85);color:#fff;font-size:19px;
+  box-shadow:var(--shadow);cursor:pointer;
+}
+#panHint{
+  position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:5;
+  background:rgba(35,48,58,.8);color:#fff;font-size:12px;font-weight:700;
+  padding:7px 14px;border-radius:12px;pointer-events:none;transition:opacity .5s;
+}
+#nav{
+  flex-shrink:0;display:flex;background:var(--panel);
+  border-top:1px solid #dde3e6;
+  padding:6px 6px calc(env(safe-area-inset-bottom) + 6px);gap:4px;
+}
+#nav button{
+  flex:1;border:0;background:none;color:var(--ink-soft);
+  font-size:10.5px;font-weight:700;font-family:inherit;
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+  padding:6px 2px;border-radius:10px;cursor:pointer;
+}
+#nav button .ic{font-size:21px;line-height:1}
+#nav button.active{background:#fff3e5;color:var(--accent-dark)}
+.overlay{position:fixed;inset:0;background:rgba(20,28,34,.45);display:none;align-items:flex-end;justify-content:center;z-index:50}
+.overlay.show{display:flex}
+.sheet{background:var(--panel);width:100%;max-width:520px;border-radius:20px 20px 0 0;max-height:78dvh;display:flex;flex-direction:column;animation:up .22s ease}
+@keyframes up{from{transform:translateY(40px);opacity:.5}to{transform:none;opacity:1}}
+.sheet header{padding:14px 16px 10px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #eef1f3;flex-shrink:0}
+.sheet header h2{font-size:17px;font-weight:800}
+.sheet header .sub{font-size:12px;color:var(--ink-soft);font-weight:600}
+.x{border:0;background:#eef1f3;color:var(--ink);width:30px;height:30px;border-radius:50%;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit}
+.sheet .body{overflow-y:auto;padding:10px 14px calc(env(safe-area-inset-bottom) + 14px);-webkit-overflow-scrolling:touch}
+.row{display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid #f2f4f5}
+.row:last-child{border-bottom:0}
+.row .em{font-size:26px;width:34px;text-align:center;flex-shrink:0}
+.row .info{flex:1;min-width:0}
+.row .info b{font-size:14px;display:block}
+.row .info small{font-size:11.5px;color:var(--ink-soft);display:block;margin-top:1px}
+.btn{border:0;font-family:inherit;font-weight:800;font-size:12.5px;background:var(--accent);color:#fff;padding:9px 13px;border-radius:11px;cursor:pointer;flex-shrink:0}
+.btn:active{background:var(--accent-dark)}
+.btn.sec{background:#eef1f3;color:var(--ink)}
+.btn.danger{background:#fdecea;color:var(--red)}
+.btn.green{background:var(--green)}
+.btn:disabled{opacity:.4}
+.tag{display:inline-block;font-size:10px;font-weight:800;padding:2px 7px;border-radius:8px;background:#eef1f3;color:var(--ink-soft);vertical-align:middle;margin-left:5px}
+.tag.season{background:#fff3e5;color:var(--accent-dark)}
+.tag.flop{background:#fdecea;color:var(--red)}
+.tag.hit{background:#e7f5ec;color:var(--green)}
+.secTitle{font-size:12px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.4px;margin:14px 4px 4px}
+.progress{height:9px;background:#eef1f3;border-radius:5px;overflow:hidden;margin:6px 4px 2px}
+.progress>i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#ffb35c);border-radius:5px;transition:width .4s}
+.hourCtl{display:flex;align-items:center;gap:8px}
+.hourCtl b{min-width:52px;text-align:center;font-size:15px}
+.hourCtl .btn{padding:7px 12px}
+.dialogWrap{position:fixed;inset:0;background:rgba(20,28,34,.55);display:none;align-items:center;justify-content:center;z-index:60;padding:20px}
+.dialogWrap.show{display:flex}
+.dialog{background:var(--panel);border-radius:20px;width:100%;max-width:400px;padding:20px 18px;box-shadow:var(--shadow);animation:up .22s ease;max-height:80dvh;overflow-y:auto}
+.dialog h2{font-size:19px;font-weight:800;margin-bottom:2px}
+.dialog .sub{font-size:12.5px;color:var(--ink-soft);margin-bottom:12px}
+.stat{display:flex;justify-content:space-between;font-size:14px;padding:7px 0;border-bottom:1px solid #f2f4f5}
+.stat b.plus{color:var(--green)} .stat b.minus{color:var(--red)}
+.stat.total{border-top:2px solid var(--ink);border-bottom:0;margin-top:4px;font-weight:800;font-size:15px}
+.dialog .btn{width:100%;margin-top:14px;padding:13px;font-size:14px}
+#toast{
+  position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 86px);
+  transform:translateX(-50%) translateY(20px);
+  background:var(--ink);color:#fff;font-size:13px;font-weight:700;
+  padding:10px 16px;border-radius:14px;opacity:0;pointer-events:none;
+  transition:.25s;z-index:70;white-space:nowrap;max-width:92vw;overflow:hidden;text-overflow:ellipsis;
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.big{background:var(--accent);font-size:14px;padding:12px 20px}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <div class="money" id="uiMoney">CHF 0</div>
+  <div class="mid">
+    <div class="day" id="uiDay">Tag 1</div>
+    <div class="clock" id="uiClock">08:00</div>
+  </div>
+  <div class="clean">
+    Sauberkeit
+    <div class="cleanbar"><i id="uiClean" style="width:100%"></i></div>
+  </div>
+</div>
+
+<div id="stage">
+  <canvas id="cv"></canvas>
+  <button id="zoomBtn">🗺️</button>
+  <div id="panHint">👆 Wische, um dich umzusehen</div>
+</div>
+
+<div id="nav">
+  <button data-panel="laden" class="active"><span class="ic">🏪</span>Laden</button>
+  <button data-panel="einkauf"><span class="ic">📦</span>Einkauf</button>
+  <button data-panel="sortiment"><span class="ic">🏷️</span>Sortiment</button>
+  <button data-panel="personal"><span class="ic">🧑‍💼</span>Personal</button>
+  <button data-panel="ausbau"><span class="ic">🏗️</span>Ausbau</button>
+</div>
+
+<div class="overlay" id="panelOverlay">
+  <div class="sheet">
+    <header>
+      <div><h2 id="panelTitle"></h2><div class="sub" id="panelSub"></div></div>
+      <button class="x" id="panelClose">✕</button>
+    </header>
+    <div class="body" id="panelBody"></div>
+  </div>
+</div>
+
+<div class="dialogWrap" id="dialogWrap"><div class="dialog" id="dialogBox"></div></div>
+<div id="toast"></div>
+
+<script>
+"use strict";
+
+/* ================= DATEN ================= */
+const SEASONS = ["Frühling","Sommer","Herbst","Winter"];
+const SEASON_EMOJI = {Frühling:"🌸",Sommer:"☀️",Herbst:"🍂",Winter:"❄️"};
+const OFFLINE_CAP = 7200;
+
+const LEVELS=[
+  {name:"Dorflädeli",       mult:1.0, hallW:400, hallH:460, hallSlots:6,  wingSlots:4, backHalf:3, maxK:2,  maxS:2,  moveCost:2000},
+  {name:"Quartier-Märt",    mult:1.6, hallW:460, hallH:520, hallSlots:8,  wingSlots:5, backHalf:4, maxK:3,  maxS:4,  moveCost:6000},
+  {name:"Stadt-Supermarkt", mult:2.4, hallW:520, hallH:600, hallSlots:10, wingSlots:6, backHalf:5, maxK:5,  maxS:8,  moveCost:15000},
+  {name:"Einkaufscenter",   mult:3.4, hallW:600, hallH:700, hallSlots:12, wingSlots:7, backHalf:6, maxK:7,  maxS:16, moveCost:35000},
+  {name:"24h XL-MEGA-MÄRT", mult:4.8, hallW:680, hallH:800, hallSlots:14, wingSlots:8, backHalf:7, maxK:10, maxS:30, moveCost:0},
+];
+function LV(){ return LEVELS[S.level]; }
+function cost(base){ return Math.round(base*LV().mult); }
+
+const DEPTS = {
+  food:    {name:"Food",    emoji:"🥫", cost:0},
+  gemuese: {name:"Gemüse",  emoji:"🥦", cost:250,  wing:"left"},
+  kaese:   {name:"Käse",    emoji:"🧀", cost:400,  wing:"right"},
+  fleisch: {name:"Fleisch", emoji:"🥩", cost:650,  wing:"backL"},
+  nonfood: {name:"NonFood", emoji:"🧺", cost:500,  wing:"backR"},
+};
+
+const PRODUCTS = [
+  {id:"brot",       name:"Brot",            emoji:"🍞", dept:"food",    ek:1.0, vk:2.2,  pop:8},
+  {id:"milch",      name:"Milch",           emoji:"🥛", dept:"food",    ek:0.8, vk:1.6,  pop:9},
+  {id:"pasta",      name:"Pasta",           emoji:"🍝", dept:"food",    ek:0.9, vk:1.9,  pop:7},
+  {id:"schoggi",    name:"Schoggi",         emoji:"🍫", dept:"food",    ek:1.5, vk:3.2,  pop:8},
+  {id:"kaffee",     name:"Kaffee",          emoji:"☕", dept:"food",    ek:3.5, vk:6.9,  pop:6},
+  {id:"chips",      name:"Chips",           emoji:"🥔", dept:"food",    ek:1.2, vk:2.8,  pop:7},
+  {id:"glace",      name:"Glacé",           emoji:"🍦", dept:"food",    ek:1.5, vk:3.5,  pop:7, season:"Sommer"},
+  {id:"fondue",     name:"Fonduemischung",  emoji:"🫕", dept:"food",    ek:6.0, vk:11.9, pop:7, season:"Winter"},
+  {id:"aepfel",     name:"Äpfel",           emoji:"🍎", dept:"gemuese", ek:1.0, vk:2.4,  pop:8},
+  {id:"bananen",    name:"Bananen",         emoji:"🍌", dept:"gemuese", ek:0.9, vk:2.1,  pop:8},
+  {id:"tomaten",    name:"Tomaten",         emoji:"🍅", dept:"gemuese", ek:1.2, vk:2.9,  pop:7},
+  {id:"salat",      name:"Salat",           emoji:"🥬", dept:"gemuese", ek:0.8, vk:2.0,  pop:6},
+  {id:"erdbeeren",  name:"Erdbeeren",       emoji:"🍓", dept:"gemuese", ek:2.0, vk:4.5,  pop:8, season:"Frühling"},
+  {id:"kuerbis",    name:"Kürbis",          emoji:"🎃", dept:"gemuese", ek:1.5, vk:3.5,  pop:6, season:"Herbst"},
+  {id:"gruyere",    name:"Gruyère",         emoji:"🧀", dept:"kaese",   ek:3.0, vk:5.9,  pop:7},
+  {id:"mozzarella", name:"Mozzarella",      emoji:"🫓", dept:"kaese",   ek:1.5, vk:3.2,  pop:6},
+  {id:"raclette",   name:"Raclette",        emoji:"🫠", dept:"kaese",   ek:3.5, vk:6.9,  pop:6, season:"Winter"},
+  {id:"poulet",     name:"Poulet",          emoji:"🍗", dept:"fleisch", ek:4.0, vk:7.9,  pop:7},
+  {id:"hack",       name:"Hackfleisch",     emoji:"🥩", dept:"fleisch", ek:3.5, vk:6.9,  pop:6},
+  {id:"grillwurst", name:"Grillwurst",      emoji:"🌭", dept:"fleisch", ek:2.5, vk:5.5,  pop:7, season:"Sommer"},
+  {id:"wcpapier",   name:"WC-Papier",       emoji:"🧻", dept:"nonfood", ek:2.0, vk:4.5,  pop:7},
+  {id:"putzmittel", name:"Putzmittel",      emoji:"🧴", dept:"nonfood", ek:2.5, vk:4.9,  pop:5},
+  {id:"pfanne",     name:"Bratpfanne",      emoji:"🍳", dept:"nonfood", ek:9.0, vk:19.9, pop:3},
+  {id:"grillkohle", name:"Grillkohle",      emoji:"🔥", dept:"nonfood", ek:3.0, vk:6.9,  pop:4, season:"Sommer"},
+];
+const P = {}; PRODUCTS.forEach(p=>P[p.id]=p);
+
+const STAFF = {
+  auffueller: {name:"Auffüller/in",      emoji:"🧑‍🔧", wage:60, desc:"Füllt Regale automatisch aus dem Lager auf."},
+  kassierer:  {name:"Kassierer/in",      emoji:"🧑‍💼", wage:80, desc:"Bedient die Kassen automatisch."},
+  putz:       {name:"Putzkraft",         emoji:"🧹",   wage:50, desc:"Putzt Laden und Vorplatz automatisch."},
+  sicherheit: {name:"Sicherheitsdienst", emoji:"💂",   wage:90, desc:"Weniger Diebstahl am Self-Scanning (−8% pro Person)."},
+};
+
+/* ================= SPIELZUSTAND ================= */
+function defaultState(){
+  return {
+    v:2,
+    money:80, day:1, t:0, level:0,
+    openH:9, closeH:13,
+    shopName:"",
+    staffShift:{auffueller:"full", kassierer:"full", putz:"full", sicherheit:"full"},
+    hallShelves:3,
+    shelves:{ h0:{prod:"brot",units:15}, h1:{prod:"milch",units:15}, h2:{prod:"pasta",units:10} },
+    lager:{brot:20, milch:20, pasta:15, schoggi:10},
+    assortment:["brot","milch","pasta","schoggi"],
+    depts:["food"],
+    kassen:1, selfscans:1,
+    staff:{auffueller:0, kassierer:0, putz:0, sicherheit:0},
+    staffRoom:100,
+    billboard:false, busstop:false, reno:false,
+    stats:{},
+    dayLog:{rev:0, theft:0, thefts:0, buys:0, sold:0, angry:0},
+    lifetime:{rev:0, days:0},
+    lastSave:Date.now(),
+    tutorialDone:false, moveOffered:false,
+  };
+}
+let S = defaultState();
+function ensureStats(){ PRODUCTS.forEach(p=>{ if(!S.stats[p.id]) S.stats[p.id]={total:0,today:0,yesterday:0}; }); }
+ensureStats();
+
+/* ================= SPEICHERN / LADEN ================= */
+const SAVE_KEY = "maert_tycoon_v1";
+let canStore = true;
+function save(){
+  if(!canStore) return;
+  try{ S.lastSave=Date.now(); localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }
+  catch(e){ canStore=false; }
+}
+function load(){
+  try{
+    const raw=localStorage.getItem(SAVE_KEY);
+    if(!raw) return false;
+    const d=JSON.parse(raw);
+    if(!d) return false;
+    if(d.v===1){ // Migration von der alten Version
+      const n=defaultState();
+      ["money","day","staff","staffRoom","assortment","lager","stats","lifetime","kassen","selfscans","depts","billboard","busstop","reno","tutorialDone"].forEach(k=>{ if(d[k]!==undefined) n[k]=d[k]; });
+      n.hallShelves=Math.min(6, Array.isArray(d.shelves)? d.shelves.length : 3);
+      n.shelves={};
+      if(Array.isArray(d.shelves)) d.shelves.forEach((sh,i)=>{ if(i<n.hallShelves) n.shelves["h"+i]={prod:sh.prod||null, units:sh.units||0}; });
+      n.kassen=Math.min(n.kassen, LEVELS[0].maxK);
+      n.selfscans=Math.min(n.selfscans, LEVELS[0].maxS);
+      S=n; ensureStats(); return true;
+    }
+    if(d.v!==2) return false;
+    S=Object.assign(defaultState(), d);
+    ensureStats(); return true;
+  }catch(e){ canStore=false; return false; }
+}
+
+/* ================= HILFEN ================= */
+const $ = id => document.getElementById(id);
+const fmt = n => "CHF " + (Math.round(n*20)/20).toFixed(2).replace(/\.00$/,".–");
+const fmtS = n => "CHF " + Math.round(n).toLocaleString("de-CH");
+function season(){ return SEASONS[Math.floor((S.day-1)/5)%4]; }
+function popOf(p){
+  if(!p.season) return p.pop;
+  return p.season===season() ? p.pop*3 : p.pop*0.25;
+}
+function theftChance(){ return Math.max(0.02, 0.20 - staffOn("sicherheit")*0.08); }
+function cleanPct(){ return Math.max(0, Math.min(100, 100 - dirt.length*6 - odirt.length*4)); }
+function staffEff(){ return S.staffRoom<30 ? 0.5 : 1; }
+function dayLen(){ return (S.closeH-S.openH)*50; }   // 12h = 600s
+function dayHour(){ return S.openH + (S.t/dayLen())*(S.closeH-S.openH); }
+function pricedHours(a,b){
+  const normal=Math.max(0, Math.min(b,20)-Math.max(a,8));
+  const extra=(b-a)-normal;
+  return normal + extra*1.5;
+}
+function hoursFactor(){ return pricedHours(S.openH,S.closeH)/12; }
+const SHIFTS={
+  full:{name:"Ganzer Tag", emoji:"🕗"},
+  morning:{name:"Vormittag", emoji:"🌅"},
+  evening:{name:"Nachmittag", emoji:"🌆"},
+};
+function shiftRange(k){
+  const s=(S.staffShift&&S.staffShift[k])||"full";
+  if(s==="morning") return [S.openH, Math.min(13,S.closeH)];
+  if(s==="evening") return [Math.max(13,S.openH), S.closeH];
+  return [S.openH, S.closeH];
+}
+function shiftHours(k){ const r=shiftRange(k); return Math.max(0, r[1]-r[0]); }
+function staffOn(k){
+  if(!S.staff[k]) return 0;
+  const h=dayHour(), r=shiftRange(k);
+  return (h>=r[0] && h<r[1]) ? S.staff[k] : 0;
+}
+function wagesPerDay(){
+  let sum=0;
+  Object.keys(STAFF).forEach(k=>{
+    const r=shiftRange(k);
+    sum += S.staff[k]*STAFF[k].wage*Math.max(0,pricedHours(r[0],r[1]))/12;
+  });
+  return Math.round(sum);
+}
+function trafficMult(){
+  const h=dayHour();
+  let v = 0.45
+    + 1.15*Math.exp(-Math.pow((h-12.2)/1.7,2))
+    + 0.55*Math.exp(-Math.pow((h-17.6)/1.4,2));
+  if(h<7 || h>21) v*=0.35;   // Nachtstunden: nur Nachtschwärmer
+  return v;
+}
+function toast(msg,big){
+  const el=$("toast"); el.textContent=msg;
+  el.classList.toggle("big",!!big); el.classList.add("show");
+  clearTimeout(toast._t); toast._t=setTimeout(()=>el.classList.remove("show"), big?3200:2200);
+}
+function clockStr(){
+  const h=dayHour();
+  const hh=Math.floor(h), mm=Math.floor((h-hh)*60);
+  return String(hh).padStart(2,"0")+":"+String(mm).padStart(2,"0");
+}
+function completion(){
+  const L=LV();
+  let have=0, tot=0;
+  tot+=L.hallSlots;      have+=S.hallShelves;
+  tot+=4;                have+=S.depts.length-1;
+  tot+=L.maxK-1;         have+=S.kassen-1;
+  tot+=L.maxS-1;         have+=S.selfscans-1;
+  tot+=3;                have+=(S.billboard?1:0)+(S.busstop?1:0)+(S.reno?1:0);
+  return Math.min(1, have/tot);
+}
+
+/* ================= LAYOUT-BAUKASTEN ================= */
+/* Die Welt wird pro Level aufgebaut. Flügel (Anbauten) haben immer
+   reservierten Platz und erscheinen, sobald die Abteilung gekauft ist. */
+let LY=null;
+function buildLayout(){
+  const L=LV();
+  const WING_W=132, BACK_H=124, M=24;
+  const hallX=M+WING_W, hallY=M+BACK_H+18;
+  const hall={x:hallX, y:hallY, w:L.hallW, h:L.hallH};
+  const aisleX=hall.x+hall.w/2;
+  const worldW=M*2+WING_W*2+L.hallW;
+  const plazaTop=hall.y+hall.h+24;
+  const roadY=plazaTop+118;
+  const worldH=roadY+58;
+
+  const slots=[];
+  // --- Halle: 2 Spalten, freie Produktwahl ---
+  const doorY0=hall.y+hall.h-8;
+  const ckY0=doorY0-150;
+  const perRow=Math.max(3, Math.floor((L.hallW/2-20)/48));
+  const scanRows=Math.ceil(L.maxS/perRow);
+  const scanTop=ckY0-46-(scanRows-1)*40;
+  const shelfBottom=scanTop-46;
+  const rows=Math.ceil(L.hallSlots/2);
+  const rowGap=Math.max(44, Math.min(64, (shelfBottom-(hall.y+96))/Math.max(1,rows-1))), rowY0=hall.y+96;
+  for(let r=0;r<rows;r++){
+    for(let cI=0;cI<2;cI++){
+      const idx=r*2+cI; if(idx>=L.hallSlots) break;
+      const side=cI===0?"L":"R";
+      const x=side==="L"? hall.x+92 : hall.x+hall.w-92;
+      const y=rowY0+r*rowGap;
+      slots.push({id:"h"+idx, zone:"hall", side, x, y,
+        appr:{x: side==="L"? x+55 : x-55, y},
+        route:[{x:aisleX,y},{x:side==="L"? x+55:x-55,y}]});
+    }
+  }
+  // --- Flügel links (Gemüse) & rechts (Käse) ---
+  function wing(sideKey, dept){
+    const isL=sideKey==="left";
+    const wx=isL? M : hallX+L.hallW;
+    const w={x:wx, y:hall.y+70, w:WING_W, h:Math.min(hall.h-160, 90+L.wingSlots*60)};
+    w.doorY=w.y+w.h/2;
+    w.corrX=isL? w.x+WING_W-34 : w.x+34;
+    w.dept=dept;
+    w.slots=[];
+    for(let i=0;i<L.wingSlots;i++){
+      const y=w.y+52+i*58;
+      if(y>w.y+w.h-24) break;
+      const x=isL? w.x+52 : w.x+WING_W-52;
+      const s={id:(isL?"L":"R")+i, zone:dept, side:isL?"L":"R", x, y,
+        appr:{x:isL? x+50 : x-50, y},
+        route:[{x:aisleX,y:w.doorY},{x:w.corrX,y:w.doorY},{x:w.corrX,y},{x:isL? x+50:x-50,y}]};
+      slots.push(s); w.slots.push(s);
+    }
+    return w;
+  }
+  const left  = S.depts.includes("gemuese")? wing("left","gemuese") : null;
+  const right = S.depts.includes("kaese")?   wing("right","kaese")  : null;
+
+  // --- Hinterraum (Fleisch links, NonFood rechts) ---
+  const hasBL=S.depts.includes("fleisch"), hasBR=S.depts.includes("nonfood");
+  let back=null;
+  if(hasBL||hasBR){
+    back={x:hall.x, y:M, w:hall.w, h:BACK_H, corrY:M+BACK_H-32, hasBL, hasBR};
+    const mkBack=(half,startX,prefix,dept)=>{
+      for(let i=0;i<L.backHalf;i++){
+        const x=startX+i*104;
+        if(x>hall.x+hall.w-60) break;
+        if(half==="L" && x>aisleX-60) break;
+        if(half==="R" && x<aisleX+60) continue;
+        const y=back.y+44;
+        slots.push({id:prefix+i, zone:dept, side:"B", x, y,
+          appr:{x, y:y+36},
+          route:[{x:aisleX,y:hall.y+56},{x:aisleX,y:back.corrY},{x,y:back.corrY},{x,y:y+36}]});
+      }
+    };
+    if(hasBL) mkBack("L", hall.x+64, "F", "fleisch");
+    if(hasBR) mkBack("R", aisleX+64, "N", "nonfood");
+  }
+
+  // --- Lager, Personalraum, Kassenzeile, Türe ---
+  const lager={x:hall.x+14, y:hall.y+10, w:hall.w/2-58, h:48};
+  const staffR={x:aisleX+44, y:hall.y+10, w:hall.w/2-58, h:48};
+  const doorY=hall.y+hall.h-8;
+  const door={x:aisleX, y:doorY-6};
+  const ckY=ckY0;
+  const kassePos=[];
+  const kSpace=Math.min(60, (hall.w-116)/Math.max(1,L.maxK-1));
+  for(let i=0;i<L.maxK;i++) kassePos.push({x:hall.x+58+i*kSpace, y:ckY});
+  const oldPods=(LY&&LY.scanPods&&LY.scanPods.length===L.maxS)? LY.scanPods : null;
+  const scanPods=[];
+  for(let i=0;i<L.maxS;i++){
+    const r=Math.floor(i/perRow), cI=i%perRow;
+    scanPods.push({x:hall.x+hall.w-44-cI*48, y:ckY-46-r*40, busy: oldPods? oldPods[i].busy : null});
+  }
+  const scanAnchor={x:hall.x+hall.w-72, y:ckY+14};
+  LY={worldW, worldH, hall, aisleX, left, right, back, lager, staffR,
+      door, kassePos, scanPods, scanAnchor, slots, plazaTop, roadY,
+      busStop:{x:hall.x-40, y:plazaTop+76},
+      billboard:{x:hall.x+hall.w+34, y:plazaTop+56},
+      storeTop: back? M : hall.y};
+}
+function slotById(id){ return LY.slots.find(s=>s.id===id); }
+function activeSlots(){
+  return LY.slots.filter(s=>{
+    if(s.zone==="hall") return parseInt(s.id.slice(1))<S.hallShelves;
+    return S.depts.includes(s.zone);
+  });
+}
+function shelfData(id){
+  if(!S.shelves[id]) S.shelves[id]={prod:null,units:0};
+  return S.shelves[id];
+}
+function shelfCap(){ return 20+S.level*5; }
+
+/* ================= LAUFZEIT ================= */
+let customers=[], dirt=[], odirt=[], effects=[];
+const BUS={active:false,x:-100,state:"",t:0,dropped:false};
+let queues={kasse:[]}, scanLine=[];
+function resetQueues(){
+  queues={kasse:Array.from({length:10},()=>[])};
+  scanLine=[];
+  if(LY&&LY.scanPods) LY.scanPods.forEach(p=>p.busy=null);
+}
+resetQueues();
+let R={spawn:2, dirtT:10, odirtT:14, bus:40, autoSave:8,
+       staffKasse:0, staffFill:0, staffPutz:0, lunch:false, rush:false};
+let paused=false, dayEnding=false;
+
+/* ================= KUNDEN ================= */
+const SKINS=["#f2c9a0","#e0a878","#c98a5b","#8d5a3b","#f5d7b8"];
+const SHIRTS=["#4a7fb5","#c05656","#5aa060","#9060b0","#d08a30","#4aa8a0","#777f88"];
+const HAIRS=["#3d2c1e","#1e1e1e","#7a4a1e","#c9a24a","#8a8a8a","#5a3a5a","#a5502a"];
+
+function stockedSlotFor(prodId){
+  let best=null;
+  activeSlots().forEach(s=>{
+    const d=S.shelves[s.id];
+    if(d && d.prod===prodId && d.units>0 && (!best || d.units>S.shelves[best.id].units)) best=s;
+  });
+  return best;
+}
+function pickList(){
+  const avail=S.assortment.filter(id=>stockedSlotFor(id));
+  if(!avail.length) return [];
+  const n=1+Math.floor(Math.random()*3);
+  const list=[];
+  for(let i=0;i<n;i++){
+    let tot=0; avail.forEach(id=>tot+=popOf(P[id]));
+    let r=Math.random()*tot;
+    for(const id of avail){ r-=popOf(P[id]); if(r<=0){ list.push(id); break; } }
+  }
+  return list;
+}
+function toAisle(c){
+  const h=LY.hall, pts=[];
+  if(c.y<h.y){ // im Hinterraum
+    pts.push({x:c.x,y:LY.back.corrY},{x:LY.aisleX,y:LY.back.corrY},{x:LY.aisleX,y:h.y+56});
+  }else if(c.x<h.x && LY.left){
+    pts.push({x:LY.left.corrX,y:c.y},{x:LY.left.corrX,y:LY.left.doorY},{x:LY.aisleX,y:LY.left.doorY});
+  }else if(c.x>h.x+h.w && LY.right){
+    pts.push({x:LY.right.corrX,y:c.y},{x:LY.right.corrX,y:LY.right.doorY},{x:LY.aisleX,y:LY.right.doorY});
+  }else{
+    pts.push({x:LY.aisleX,y:Math.min(Math.max(c.y,h.y+56),h.y+h.h-40)});
+  }
+  return pts;
+}
+function spawnCustomer(sx){
+  const list=pickList();
+  const browser = list.length===0;           // Schaufenster-Kunde ohne Ware
+  const fromBus = sx!==undefined;
+  const x0 = fromBus? sx : (Math.random()<0.5? -18 : LY.worldW+18);
+  const c={
+    x:x0, y: fromBus? LY.busStop.y+16 : LY.roadY-12,
+    path:[], list, carry:[], browser,
+    state:"enter", timer:0, wait:0,
+    skin:SKINS[Math.random()*SKINS.length|0],
+    shirt:SHIRTS[Math.random()*SHIRTS.length|0],
+    hair:HAIRS[Math.random()*HAIRS.length|0],
+    po:Math.random()*6.28,
+    speed:55+Math.random()*25,
+    q:null, angry:false, thief:false,
+  };
+  const jx=Math.random()*24-12;
+  c.path=[
+    {x:LY.door.x+jx, y:LY.roadY-26},
+    {x:LY.door.x+jx, y:LY.plazaTop+50},
+    {x:LY.door.x, y:LY.door.y-20},
+  ];
+  customers.push(c);
+}
+function leaveShop(c){
+  c.state="leave";
+  const ex=Math.random()<0.5? -24 : LY.worldW+24;
+  c.path=toAisle(c).concat([
+    {x:LY.aisleX, y:LY.door.y-20},
+    {x:LY.door.x, y:LY.plazaTop+54},
+    {x:ex<0? LY.door.x-70 : LY.door.x+70, y:LY.plazaTop+92},
+    {x:ex, y:LY.roadY-14},
+  ]);
+}
+function spawnPasser(){
+  const fromL=Math.random()<0.5;
+  const y=LY.plazaTop+56+Math.random()*48;
+  customers.push({
+    x:fromL? -18 : LY.worldW+18, y,
+    path:[{x:fromL? LY.worldW+24 : -24, y:y+Math.random()*10-5}],
+    list:[], carry:[], state:"pass", timer:0, wait:0,
+    skin:SKINS[Math.random()*SKINS.length|0],
+    shirt:SHIRTS[Math.random()*SHIRTS.length|0],
+    hair:HAIRS[Math.random()*HAIRS.length|0],
+    po:Math.random()*6.28, speed:58+Math.random()*22,
+    q:null, angry:false, thief:false, noted:false,
+  });
+}
+function nextGoal(c){
+  while(c.list.length){
+    const id=c.list.shift();
+    const slot=stockedSlotFor(id);
+    if(slot){
+      c.path=toAisle(c).concat(slot.route);
+      c.targetSlot=slot.id; c.targetProd=id; c.state="walk";
+      return;
+    }
+  }
+  if(c.browser){ // nur umgeschaut
+    c.angry=true; S.dayLog.angry++;
+    effects.push({x:c.x,y:c.y-26,txt:"nüt gfunde 💨",t:1.4,col:"#d33a2f"});
+    leaveShop(c); return;
+  }
+  if(!c.carry.length){ leaveShop(c); return; }
+  goCheckout(c);
+}
+function goCheckout(c){
+  const options=[];
+  for(let i=0;i<S.kassen;i++) options.push({type:"kasse",i,len:queues.kasse[i].length});
+  if(S.selfscans>0){
+    const free=LY.scanPods.slice(0,S.selfscans).filter(p=>!p.busy).length;
+    options.push({type:"scan", i:0, len: scanLine.length*0.5 + (free? 0 : 1.2)});
+  }
+  options.sort((a,b)=>a.len-b.len);
+  const q=options[0];
+  c.q=q; c.state="queue"; c.wait=0; c.scanT=0;
+  if(q.type==="kasse") queues.kasse[q.i].push(c); else scanLine.push(c);
+  updateQueuePos(c,true);
+}
+function updateQueuePos(c,first){
+  let arr, anchor;
+  if(c.q.type==="kasse"){
+    arr=queues.kasse[c.q.i];
+    const p=LY.kassePos[c.q.i];
+    anchor={x:p.x, y:p.y+36};
+  }else{
+    arr=scanLine;
+    anchor={x:LY.scanAnchor.x, y:LY.scanAnchor.y+24};
+  }
+  const idx=arr.indexOf(c);
+  const tgt={x:anchor.x, y:anchor.y+idx*24};
+  if(first) c.path=toAisle(c).concat([{x:LY.aisleX,y:anchor.y+36},tgt]);
+  else c.path=[tgt];
+}
+function removeFromQueue(c){
+  if(c.pod!=null){
+    const p=LY.scanPods[c.pod];
+    if(p && p.busy===c) p.busy=null;
+    c.pod=null;
+  }
+  if(!c.q) return;
+  const arr = c.q.type==="kasse" ? queues.kasse[c.q.i] : scanLine;
+  const idx=arr.indexOf(c);
+  if(idx>=0) arr.splice(idx,1);
+  arr.forEach(x=>updateQueuePos(x,false));
+  c.q=null;
+}
+function checkout(c,isScan){
+  let sum=0;
+  c.carry.forEach(it=>{ sum+=P[it.prod].vk*it.qty; });
+  if(isScan && Math.random()<theftChance()){
+    c.thief=true; c.speed*=1.8;
+    S.dayLog.theft+=sum; S.dayLog.thefts++;
+    effects.push({x:c.x,y:c.y-26,txt:"😱 geklaut!",t:1.6,col:"#d33a2f"});
+  }else{
+    S.money+=sum; S.dayLog.rev+=sum; S.lifetime.rev+=sum;
+    c.carry.forEach(it=>{ S.stats[it.prod].today+=it.qty; S.stats[it.prod].total+=it.qty; S.dayLog.sold+=it.qty; });
+    effects.push({x:c.x,y:c.y-26,txt:"+"+fmt(sum),t:1.4,col:"#1f8a4d"});
+  }
+  removeFromQueue(c);
+  leaveShop(c);
+}
+function customerGivesUp(c){
+  c.carry.forEach(it=>{
+    const d=S.shelves[it.slot];
+    if(d && d.prod===it.prod) d.units=Math.min(shelfCap(), d.units+it.qty);
+  });
+  c.carry=[]; c.angry=true; S.dayLog.angry++;
+  removeFromQueue(c);
+  effects.push({x:c.x,y:c.y-26,txt:"😤",t:1.4,col:"#d33a2f"});
+  leaveShop(c);
+}
+function updateCustomers(dt){
+  for(let i=customers.length-1;i>=0;i--){
+    const c=customers[i];
+    if(c.path.length){
+      const g=c.path[0];
+      const dx=g.x-c.x, dy=g.y-c.y, d=Math.hypot(dx,dy);
+      const step=c.speed*dt;
+      if(d<=step){ c.x=g.x; c.y=g.y; c.path.shift(); }
+      else{ c.x+=dx/d*step; c.y+=dy/d*step; }
+    }
+    switch(c.state){
+      case "enter": if(!c.path.length) c.state="shop"; break;
+      case "shop": nextGoal(c); break;
+      case "walk": if(!c.path.length){ c.state="take"; c.timer=0.9; } break;
+      case "take":
+        c.timer-=dt;
+        if(c.timer<=0){
+          const d=S.shelves[c.targetSlot];
+          if(d && d.prod===c.targetProd && d.units>0){
+            const qty=Math.min(d.units, 1+Math.floor(Math.random()*2));
+            d.units-=qty;
+            c.carry.push({prod:c.targetProd, qty, slot:c.targetSlot});
+          }
+          nextGoal(c);
+        }
+        break;
+      case "queue":{
+        const arr=(c.q.type==="kasse"?queues.kasse[c.q.i]:scanLine);
+        const first=arr[0]===c && !c.path.length;
+        c.wait+=dt;
+        if(c.wait>30 && !first) customerGivesUp(c);
+        else if(c.wait>45) customerGivesUp(c);
+        break;
+      }
+      case "topod":
+        if(!c.path.length) c.state="scanning";
+        break;
+      case "scanning":
+        c.scanT+=dt;
+        if(c.scanT>=3.5) checkout(c,true);
+        break;
+      case "pass":
+        if(!c.path.length){ customers.splice(i,1); break; }
+        if(!c.noted && Math.abs(c.x-LY.door.x)<36){
+          c.noted=true;
+          effects.push({x:c.x,y:c.y-26,txt:"🤢 dräckig do!",t:1.5,col:"#d33a2f"});
+        }
+        break;
+      case "leave": if(!c.path.length) customers.splice(i,1); break;
+    }
+  }
+}
+
+/* ================= TAGESABLAUF ================= */
+function attractInterval(){
+  const stocked=activeSlots().filter(s=>{const d=S.shelves[s.id];return d&&d.units>0;}).length;
+  let iv=5.2/(0.55 + stocked*0.16 + S.depts.length*0.12 + S.level*0.28);
+  if(S.billboard) iv/=1.35;
+  iv*= 1 + odirt.length*0.06;
+  const cl=cleanPct();
+  iv*= cl>70?0.92: cl>40?1.2:1.75;
+  iv/=trafficMult();
+  if(stocked===0) iv*=2.4;   // nur noch Schaufenster-Kundschaft
+  return Math.max(1.1, Math.min(14, iv));
+}
+function tick(dt){
+  if(paused) return;
+  S.t+=dt;
+  const h=dayHour();
+  // Mittags-Warnung & Rush
+  if(!R.lunch && h>=11 && h<12){
+    R.lunch=true;
+    toast("🍽️ Bald isch Mittag – Regale uffülle!", true);
+  }
+  if(!R.rush && h>=11.9 && h<13.5){
+    R.rush=true;
+    toast("🔥 Mittagsrush – jetzt lauft's!");
+  }
+  // Kundenspawn (Kurve über den Tag)
+  R.spawn-=dt;
+  if(!dayEnding && R.spawn<=0){
+    const passP=Math.min(0.8, odirt.length*0.12);
+    if(odirt.length && Math.random()<passP) spawnPasser();
+    else spawnCustomer();
+    R.spawn=attractInterval()*(0.7+Math.random()*0.6);
+  }
+  // Self-Scan: vorderste Person geht zum freien Automaten
+  if(scanLine.length){
+    const c0=scanLine[0];
+    if(!c0.path.length){
+      const pi=LY.scanPods.slice(0,S.selfscans).findIndex(p=>!p.busy);
+      if(pi>=0){
+        const p=LY.scanPods[pi];
+        p.busy=c0; c0.pod=pi;
+        scanLine.shift();
+        scanLine.forEach(x=>updateQueuePos(x,false));
+        c0.q=null; c0.state="topod"; c0.scanT=0;
+        c0.path=[{x:p.x, y:p.y+30}];
+      }
+    }
+  }
+  // Dreck innen
+  R.dirtT-=dt;
+  if(R.dirtT<=0){
+    R.dirtT=16+Math.random()*14;
+    if(dirt.length<14){
+      const hl=LY.hall;
+      dirt.push({x:hl.x+50+Math.random()*(hl.w-100), y:hl.y+96+Math.random()*(hl.h-200), r:7+Math.random()*5});
+    }
+  }
+  // Abfall draussen
+  R.odirtT-=dt;
+  if(R.odirtT<=0){
+    R.odirtT=20+Math.random()*18;
+    if(odirt.length<8){
+      const ems=["🍂","🥤","📄","🍌"];
+      odirt.push({x:30+Math.random()*(LY.worldW-60), y:LY.plazaTop+26+Math.random()*76, em:ems[Math.random()*4|0]});
+    }
+  }
+  // Bus
+  if(S.busstop){
+    if(!BUS.active){
+      R.bus-=dt;
+      if(R.bus<=0){ BUS.active=true; BUS.x=-100; BUS.state="in"; BUS.dropped=false; }
+    }else if(BUS.state==="in"){
+      BUS.x+=130*dt;
+      if(BUS.x>=LY.busStop.x-42){ BUS.state="stop"; BUS.t=2.6; }
+    }else if(BUS.state==="stop"){
+      BUS.t-=dt;
+      if(!BUS.dropped && BUS.t<2.1){
+        BUS.dropped=true;
+        if(!dayEnding){
+          const n=3+Math.floor(Math.random()*3);
+          for(let k=0;k<n;k++) spawnCustomer(LY.busStop.x+6+k*8);
+          effects.push({x:LY.busStop.x+30,y:LY.busStop.y-32,txt:"🚌 +Kundschaft!",t:1.8,col:"#1f8a4d"});
+        }
+      }
+      if(BUS.t<=0) BUS.state="out";
+    }else{
+      BUS.x+=150*dt;
+      if(BUS.x>LY.worldW+60){ BUS.active=false; R.bus=70+Math.random()*50; }
+    }
+  }
+  // Personalraum
+  S.staffRoom=Math.max(0, S.staffRoom - dt*(100/1500));
+  // Personal
+  const eff=staffEff();
+  const kOn=staffOn("kassierer");
+  if(kOn>0){
+    R.staffKasse-=dt;
+    if(R.staffKasse<=0){
+      R.staffKasse=2.6/(kOn*eff);
+      for(let i=0;i<S.kassen;i++){
+        const q=queues.kasse[i];
+        if(q.length && !q[0].path.length){ checkout(q[0],false); break; }
+      }
+    }
+  }
+  const fOn=staffOn("auffueller");
+  if(fOn>0){
+    R.staffFill-=dt;
+    if(R.staffFill<=0){
+      R.staffFill=4/(fOn*eff);
+      let best=null;
+      activeSlots().forEach(s=>{
+        const d=S.shelves[s.id];
+        if(d && d.prod && d.units<shelfCap() && (S.lager[d.prod]||0)>0){
+          if(!best || d.units/shelfCap() < S.shelves[best.id].units/shelfCap()) best=s;
+        }
+      });
+      if(best){
+        const d=S.shelves[best.id];
+        const n=Math.min(3, shelfCap()-d.units, S.lager[d.prod]);
+        d.units+=n; S.lager[d.prod]-=n;
+      }
+    }
+  }
+  const pOn=staffOn("putz");
+  if(pOn>0){
+    R.staffPutz-=dt;
+    if(R.staffPutz<=0){
+      R.staffPutz=7/(pOn*eff);
+      if(dirt.length) dirt.shift();
+      else if(odirt.length) odirt.shift();
+    }
+  }
+  updateCustomers(dt);
+  for(let i=effects.length-1;i>=0;i--){ effects[i].t-=dt; effects[i].y-=12*dt; if(effects[i].t<=0) effects.splice(i,1); }
+  // 100% erreicht?
+  if(!S.moveOffered && S.level<4 && completion()>=1){
+    S.moveOffered=true; save();
+    offerMove();
+  }
+  // Tagesende
+  if(S.t>=dayLen() && !dayEnding){
+    dayEnding=true;
+    customers.forEach(c=>{ if(c.state==="enter"||c.state==="shop"||c.state==="walk"||c.state==="take") c.list=[]; });
+  }
+  if(dayEnding && customers.length===0) endDay();
+  R.autoSave-=dt;
+  if(R.autoSave<=0){ R.autoSave=8; save(); }
+}
+function endDay(){
+  paused=true; dayEnding=false;
+  const wages=wagesPerDay();
+  const ads=S.billboard?20:0;
+  S.money-=wages+ads;
+  const L=S.dayLog;
+  const profit=L.rev-wages-ads-L.buys;
+  let best=null, flop=null;
+  S.assortment.forEach(id=>{
+    const st=S.stats[id];
+    if(!best || st.today>S.stats[best].today) best=id;
+    if(!flop || st.today<S.stats[flop].today) flop=id;
+  });
+  const hrs=(S.closeH-S.openH);
+  showDialog(`
+    <h2>📊 Tagesbericht – Tag ${S.day}</h2>
+    <div class="sub">${LV().name} · ${SEASON_EMOJI[season()]} ${season()} · ${String(S.openH).padStart(2,"0")}–${String(S.closeH).padStart(2,"0")} Uhr · ${L.sold} Artikel${L.angry?` · ${L.angry}× genervt`:""}</div>
+    <div class="stat"><span>Umsatz</span><b class="plus">+${fmtS(L.rev)}</b></div>
+    <div class="stat"><span>Diebstahl (${L.thefts}×)</span><b class="minus">−${fmtS(L.theft)}</b></div>
+    <div class="stat"><span>Wareneinkauf</span><b class="minus">−${fmtS(L.buys)}</b></div>
+    <div class="stat"><span>Löhne (${hrs}h${hoursFactor()>1.01?" inkl. Zuschlag":""})</span><b class="minus">−${fmtS(wages)}</b></div>
+    ${ads?`<div class="stat"><span>Werbetafel</span><b class="minus">−${fmtS(ads)}</b></div>`:""}
+    <div class="stat total"><span>Tagesgewinn</span><b class="${profit>=0?'plus':'minus'}">${profit>=0?"+":"−"}${fmtS(Math.abs(profit))}</b></div>
+    ${best?`<div class="stat"><span>🏆 Bestseller</span><b>${P[best].emoji} ${P[best].name} (${S.stats[best].today}×)</b></div>`:""}
+    ${flop?`<div class="stat"><span>🐌 Ladenhüter</span><b>${P[flop].emoji} ${P[flop].name} (${S.stats[flop].today}×)</b></div>`:""}
+    <button class="btn" onclick="startNextDay()">Tag ${S.day+1} starten ▶</button>
+  `);
+  S.assortment.forEach(id=>{ S.stats[id].yesterday=S.stats[id].today; S.stats[id].today=0; });
+  S.day++; S.t=0; S.lifetime.days++;
+  S.dayLog={rev:0,theft:0,thefts:0,buys:0,sold:0,angry:0};
+  dirt=dirt.slice(0,Math.floor(dirt.length/2));
+  odirt=odirt.slice(0,Math.floor(odirt.length/2));
+  save();
+}
+function startNextDay(){
+  closeDialog(); paused=false;
+  R.spawn=1.5; R.lunch=false; R.rush=false;
+  if(S.money<0) toast("⚠️ Du bist im Minus – verkauf mehr!");
+}
+
+/* ================= LEVEL-AUFSTIEG ================= */
+function offerMove(){
+  paused=true;
+  const nxt=LEVELS[S.level+1];
+  showDialog(`
+    <h2>🎉 100% ausgebaut!</h2>
+    <div class="sub">Dein ${LV().name} ist komplett. Zeit für was Grösseres?</div>
+    <div class="stat"><span>Nächster Laden</span><b>${nxt.name}</b></div>
+    <div class="stat"><span>Grössere Halle</span><b>${nxt.hallSlots} Regalplätze</b></div>
+    <div class="stat"><span>Mehr Kassen</span><b>${nxt.maxK}× Kasse, ${nxt.maxS}× Self-Scan</b></div>
+    <div class="stat"><span>Umzugskosten</span><b class="minus">−${fmtS(LV().moveCost)}</b></div>
+    <p style="font-size:12px;color:var(--ink-soft);margin-top:8px">Personal, Sortiment und Lager ziehen mit um. Einrichtung und Anbauten baust du im neuen Laden wieder auf (Level ${S.level+2}-Preise).</p>
+    <button class="btn green" onclick="moveLevel()" ${S.money<LV().moveCost?"disabled":""}>Umziehen! 🚚</button>
+    <button class="btn sec" onclick="closeDialog();paused=false;">Später (siehe «Ausbau»)</button>
+  `);
+}
+function moveLevel(){
+  const c=LV().moveCost;
+  if(S.money<c){ toast("💸 Zu wenig Geld für den Umzug!"); return; }
+  S.money-=c; S.level++;
+  S.hallShelves=3; S.kassen=1; S.selfscans=1;
+  S.depts=["food"];
+  S.billboard=false; S.busstop=false; S.reno=false;
+  S.shelves={}; S.moveOffered=false;
+  customers=[]; dirt=[]; odirt=[]; effects=[]; resetQueues(); BUS.active=false;
+  buildLayout();
+  const tops=S.assortment.filter(id=>P[id].dept==="food").slice(0,3);
+  tops.forEach((id,i)=>{
+    const n=Math.min(shelfCap(), S.lager[id]||0);
+    S.shelves["h"+i]={prod:id, units:n};
+    S.lager[id]=(S.lager[id]||0)-n;
+  });
+  camCenterDoor(); save();
+  showDialog(`
+    <h2>🚚 Willkomme im ${LV().name}!</h2>
+    <div class="sub">Level ${S.level+1} von 5 · alles ist grösser – bau ihn wieder auf 100% aus!</div>
+    <button class="btn" onclick="closeDialog();paused=false;">Laden eröffnen ▶</button>
+  `);
+}
+window.moveLevel=moveLevel;
+
+/* ================= OFFLINE-FORTSCHRITT ================= */
+function offlineSim(){
+  const elapsed=Math.min(OFFLINE_CAP,(Date.now()-S.lastSave)/1000);
+  if(elapsed<120) return;
+  const canSell=S.staff.kassierer>0 || S.selfscans>0;
+  if(!canSell) return;
+  let shelfUnits=0;
+  activeSlots().forEach(s=>{ const d=S.shelves[s.id]; if(d) shelfUnits+=d.units; });
+  let lagerUnits=0;
+  if(S.staff.auffueller>0) Object.keys(S.lager).forEach(k=>lagerUnits+=S.lager[k]);
+  const avail=shelfUnits+lagerUnits;
+  if(avail<=0) return;
+  const speed=S.staff.kassierer>0?1:0.7;
+  let sold=Math.min(avail, Math.floor(elapsed/5*0.3*speed*1.8));
+  if(sold<=0) return;
+  let vkSum=0,n=0;
+  activeSlots().forEach(s=>{ const d=S.shelves[s.id]; if(d&&d.prod){ vkSum+=P[d.prod].vk; n++; } });
+  const avgVK=n? vkSum/n : 2;
+  let toSell=sold;
+  activeSlots().forEach(s=>{
+    const d=S.shelves[s.id]; if(!d) return;
+    const take=Math.min(d.units, Math.ceil(toSell*(d.units/Math.max(1,shelfUnits))));
+    d.units-=take; toSell-=take;
+  });
+  if(toSell>0 && S.staff.auffueller>0){
+    for(const k of Object.keys(S.lager)){
+      const take=Math.min(S.lager[k],toSell);
+      S.lager[k]-=take; toSell-=take;
+      if(!toSell) break;
+    }
+  }
+  sold-=Math.max(0,toSell);
+  let rev=sold*avgVK, theft=0;
+  if(S.staff.kassierer===0){ theft=rev*theftChance(); rev-=theft; }
+  const dayFrac=elapsed/dayLen();
+  const wages=wagesPerDay()*dayFrac;
+  S.money+=rev-wages;
+  S.lifetime.rev+=rev;
+  S.staffRoom=Math.max(0,S.staffRoom-dayFrac*40);
+  const mins=Math.round(elapsed/60);
+  showDialog(`
+    <h2>😴 Willkommen zurück!</h2>
+    <div class="sub">Dein Laden lief ${mins} Minuten weiter (gedrosselt).</div>
+    <div class="stat"><span>Verkaufte Artikel</span><b>${sold}</b></div>
+    <div class="stat"><span>Umsatz</span><b class="plus">+${fmtS(rev)}</b></div>
+    ${theft>0?`<div class="stat"><span>Diebstahl</span><b class="minus">−${fmtS(theft)}</b></div>`:""}
+    <div class="stat"><span>Löhne (anteilig)</span><b class="minus">−${fmtS(wages)}</b></div>
+    <button class="btn" onclick="closeDialog();paused=false;">Weiter geht's ▶</button>
+  `);
+  paused=true;
+}
+
+/* ================= KAMERA & RENDERING ================= */
+const cv=$("cv"), ctx=cv.getContext("2d");
+let stW=0, stH=0, sc=1, zoomFit=false;
+const cam={x:0,y:0};
+function computeScale(){
+  if(zoomFit) sc=Math.min(stW/LY.worldW, stH/LY.worldH);
+  else sc=stW/460;
+}
+function clampCam(){
+  const vw=stW/sc, vh=stH/sc;
+  cam.x = LY.worldW<=vw ? (LY.worldW-vw)/2 : Math.max(0, Math.min(LY.worldW-vw, cam.x));
+  cam.y = LY.worldH<=vh ? (LY.worldH-vh)/2 : Math.max(0, Math.min(LY.worldH-vh, cam.y));
+}
+function camCenterDoor(){
+  computeScale();
+  cam.x=LY.door.x - (stW/sc)/2;
+  cam.y=LY.door.y - (stH/sc)*0.62;
+  clampCam();
+}
+function resize(){
+  const st=$("stage");
+  stW=st.clientWidth; stH=st.clientHeight;
+  cv.width=Math.round(stW*devicePixelRatio);
+  cv.height=Math.round(stH*devicePixelRatio);
+  cv.style.width=stW+"px"; cv.style.height=stH+"px";
+  computeScale(); clampCam();
+}
+window.addEventListener("resize",resize);
+$("zoomBtn").onclick=()=>{
+  zoomFit=!zoomFit;
+  $("zoomBtn").textContent=zoomFit?"🔍":"🗺️";
+  computeScale();
+  if(!zoomFit) camCenterDoor(); else clampCam();
+};
+
+function rr(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+}
+function shade(hex,f){
+  const n=parseInt(hex.slice(1),16);
+  const r=Math.min(255,Math.round(((n>>16)&255)*f)),
+        g=Math.min(255,Math.round(((n>>8)&255)*f)),
+        b=Math.min(255,Math.round((n&255)*f));
+  return `rgb(${r},${g},${b})`;
+}
+function box3(x,y,w,h,d,top,r){
+  ctx.fillStyle=shade(top,0.62); rr(x,y+h-4,w,d+4,Math.min(r,5)); ctx.fill();
+  ctx.fillStyle=top; rr(x,y,w,h,r); ctx.fill();
+}
+const DEPT_STYLE={
+  food:   {frame:"#9a7248", inner:"#c9a06b"},
+  gemuese:{frame:"#4d7a44", inner:"#8db97e"},
+  kaese:  {frame:"#5f88a8", inner:"#e4f0f6", cool:true},
+  fleisch:{frame:"#a05656", inner:"#f2e2e2", cool:true},
+  nonfood:{frame:"#7c828c", inner:"#c2c7ce"},
+};
+function drawPerson(x,y,shirt,skin,hair,o){
+  o=o||{};
+  ctx.fillStyle="rgba(0,0,0,.15)";
+  ctx.beginPath(); ctx.ellipse(x,y+9,8,3.5,0,0,7); ctx.fill();
+  const walking=o.phase!==undefined;
+  const bob=walking? Math.sin(o.phase)*1.2 : 0;
+  if(walking){
+    ctx.strokeStyle="#3a4750"; ctx.lineWidth=3; ctx.lineCap="round";
+    const lp=Math.sin(o.phase)*3.2;
+    ctx.beginPath(); ctx.moveTo(x-3,y+3); ctx.lineTo(x-3+lp,y+8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x+3,y+3); ctx.lineTo(x+3-lp,y+8); ctx.stroke();
+  }
+  ctx.fillStyle=shirt; rr(x-7,y-8+bob*.3,14,15,6); ctx.fill();
+  if(o.apron){ ctx.fillStyle=o.apron; rr(x-5,y-5+bob*.3,10,11,4); ctx.fill(); }
+  if(o.vest){ ctx.strokeStyle=o.vest; ctx.lineWidth=2.5;
+    ctx.beginPath(); ctx.moveTo(x-6,y-7+bob*.3); ctx.lineTo(x+6,y+2+bob*.3); ctx.stroke(); }
+  ctx.fillStyle=skin; ctx.beginPath(); ctx.arc(x,y-13+bob*.5,6.5,0,7); ctx.fill();
+  ctx.fillStyle=hair||"#3d2c1e";
+  ctx.beginPath(); ctx.arc(x,y-14.3+bob*.5,6.1,Math.PI,2*Math.PI); ctx.fill();
+  if(o.hat){
+    ctx.fillStyle=o.hat;
+    rr(x-7,y-20.5+bob*.5,14,3.5,2); ctx.fill();
+    rr(x-4.5,y-24.5+bob*.5,9,5,2); ctx.fill();
+  }
+}
+const VIS={ putz:{x:0,y:0,init:false}, auff:{x:0,y:0,carry:false,init:false}, last:0 };
+function moveVis(p,tx,ty,speed,dtv){
+  const dx=tx-p.x, dy=ty-p.y, d=Math.hypot(dx,dy);
+  if(d<2) return true;
+  const st=Math.min(d,speed*dtv);
+  p.x+=dx/d*st; p.y+=dy/d*st;
+  return false;
+}
+function drawStaff(now,dtv){
+  if(!VIS.putz.init){ VIS.putz={x:LY.aisleX+20,y:LY.hall.y+130,init:true}; }
+  if(!VIS.auff.init){ VIS.auff={x:LY.aisleX-30,y:LY.hall.y+130,carry:false,init:true}; }
+  if(staffOn("kassierer")>0){
+    for(let i=0;i<Math.min(S.kassen,staffOn("kassierer"));i++){
+      const p=LY.kassePos[i];
+      drawPerson(p.x-2,p.y-26,"#2e6da4","#e8bd90","#4a3220",{apron:"#ff9d3f"});
+    }
+  }
+  if(staffOn("sicherheit")>0){
+    const p=LY.scanAnchor;
+    drawPerson(p.x+34,p.y-18,"#2f3b46","#c98a5b","#1e1e1e",{hat:"#2f3b46",vest:"#ffd23f"});
+    ctx.font="9px -apple-system,sans-serif"; ctx.textAlign="center";
+    ctx.fillText("👀", p.x+34, p.y-48);
+  }
+  if(staffOn("putz")>0){
+    const tgt=dirt[0]||odirt[0];
+    let moving=false;
+    if(tgt){ moving=!moveVis(VIS.putz,tgt.x,tgt.y-8,46,dtv); }
+    else{ moving=!moveVis(VIS.putz,LY.aisleX+40,LY.hall.y+130,32,dtv); }
+    drawPerson(VIS.putz.x,VIS.putz.y,"#5aa060","#f2c9a0","#7a4a1e",{apron:"#d9e2e8",phase:moving?now*9:undefined});
+    ctx.font="11px -apple-system,sans-serif"; ctx.textAlign="center";
+    ctx.fillText("🧹", VIS.putz.x+9, VIS.putz.y+2);
+  }
+  if(staffOn("auffueller")>0){
+    let bestS=null, worst=1;
+    activeSlots().forEach(s=>{
+      const d=S.shelves[s.id];
+      if(d && d.prod && d.units<shelfCap() && (S.lager[d.prod]||0)>0 && d.units/shelfCap()<worst){
+        worst=d.units/shelfCap(); bestS=s;
+      }
+    });
+    const home={x:LY.lager.x+LY.lager.w/2, y:LY.lager.y+LY.lager.h+16};
+    let moving=false;
+    if(bestS){
+      if(VIS.auff.carry){ moving=!moveVis(VIS.auff,bestS.appr.x,bestS.appr.y,50,dtv); if(!moving) VIS.auff.carry=false; }
+      else{ moving=!moveVis(VIS.auff,home.x,home.y,50,dtv); if(!moving) VIS.auff.carry=true; }
+    }else{ moving=!moveVis(VIS.auff,home.x,home.y,40,dtv); }
+    drawPerson(VIS.auff.x,VIS.auff.y,"#d08a30","#c98a5b","#1e1e1e",{apron:"#eef1f3",phase:moving?now*9:undefined});
+    if(VIS.auff.carry){ ctx.font="11px -apple-system,sans-serif"; ctx.fillText("📦", VIS.auff.x+10, VIS.auff.y-4); }
+  }
+}
+
+function drawRoom(rect, wallCol, flA, flB, label){
+  ctx.fillStyle="rgba(0,0,0,.20)";
+  rr(rect.x+6,rect.y+10,rect.w,rect.h+8,14); ctx.fill();
+  ctx.fillStyle=wallCol; rr(rect.x,rect.y,rect.w,rect.h,12); ctx.fill();
+  ctx.strokeStyle=shade(wallCol,0.8); ctx.lineWidth=2;
+  rr(rect.x,rect.y,rect.w,rect.h,12); ctx.stroke();
+  const ix=rect.x+8, iy=rect.y+8, iw=rect.w-16, ih=rect.h-16;
+  ctx.save(); rr(ix,iy,iw,ih,6); ctx.clip();
+  for(let ty=0;ty<ih/40+1;ty++){
+    for(let tx=0;tx<iw/40+1;tx++){
+      ctx.fillStyle=(tx+ty)%2? flA : flB;
+      ctx.fillRect(ix+tx*40, iy+ty*40, 40, 40);
+    }
+  }
+  ctx.restore();
+  if(label){
+    ctx.fillStyle="rgba(35,48,58,.30)"; ctx.font="800 11px -apple-system,sans-serif"; ctx.textAlign="center";
+    ctx.fillText(label, rect.x+rect.w/2, rect.y+22);
+  }
+}
+
+function render(){
+  const now=performance.now()/1000;
+  const dtv=Math.min(0.1, now-(VIS.last||now)); VIS.last=now;
+  ctx.setTransform(sc*devicePixelRatio,0,0,sc*devicePixelRatio,
+                   -cam.x*sc*devicePixelRatio, -cam.y*sc*devicePixelRatio);
+  ctx.textAlign="center";
+  const WW=LY.worldW, WH=LY.worldH;
+  // Wiese
+  ctx.fillStyle="#7fae70"; ctx.fillRect(cam.x-50,cam.y-50,stW/sc+100,stH/sc+100);
+  ctx.fillStyle="rgba(255,255,255,.06)";
+  for(let i=0;i<40;i++){
+    const gx=(i*97)%WW, gy=(i*61)%(LY.plazaTop-10);
+    ctx.fillRect(gx,gy,3,3);
+  }
+  // Vorplatz
+  for(let ty=0; ty<(LY.roadY-LY.plazaTop)/30+1; ty++){
+    for(let tx=0; tx<WW/30+1; tx++){
+      ctx.fillStyle=(tx+ty)%2? "#cfcbc2" : "#c6c2b8";
+      ctx.fillRect(tx*30, LY.plazaTop+ty*30, 30, Math.min(30, LY.roadY-(LY.plazaTop+ty*30)));
+    }
+  }
+  ctx.fillStyle="rgba(0,0,0,.06)"; ctx.fillRect(0,LY.plazaTop,WW,3);
+  // Strasse
+  ctx.fillStyle="#4a4f55"; ctx.fillRect(-60,LY.roadY,WW+120,50);
+  ctx.fillStyle="#b8bcc2"; ctx.fillRect(-60,LY.roadY-4,WW+120,4);
+  ctx.strokeStyle="rgba(255,255,255,.7)"; ctx.lineWidth=2.5; ctx.setLineDash([14,12]);
+  ctx.beginPath(); ctx.moveTo(-60,LY.roadY+25); ctx.lineTo(WW+60,LY.roadY+25); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.font="11px -apple-system,sans-serif";
+  [[16,LY.plazaTop+12],[WW-16,LY.plazaTop+12]].forEach(([gx,gy])=>ctx.fillText("🌼",gx,gy));
+
+  // Bushaltestelle
+  if(S.busstop){
+    const b=LY.busStop;
+    ctx.fillStyle="rgba(0,0,0,.14)";
+    ctx.beginPath(); ctx.ellipse(b.x,b.y+16,44,8,0,0,7); ctx.fill();
+    ctx.fillStyle="#5f6b74"; ctx.fillRect(b.x-38,b.y-26,4,40); ctx.fillRect(b.x+34,b.y-26,4,40);
+    box3(b.x-44,b.y-34,88,10,6,"#ff9d3f",4);
+    ctx.fillStyle="rgba(190,220,235,.55)"; ctx.fillRect(b.x-36,b.y-22,72,26);
+    ctx.fillStyle="#8a6a3a"; rr(b.x-28,b.y+2,56,7,3); ctx.fill();
+    ctx.fillStyle="#5f6b74"; ctx.fillRect(b.x+52,b.y-34,3,50);
+    ctx.fillStyle="#ffd23f"; rr(b.x+44,b.y-46,20,16,3); ctx.fill();
+    ctx.font="10px -apple-system,sans-serif";
+    ctx.fillText("🚌", b.x+54, b.y-34);
+  }
+  // Werbetafel
+  if(S.billboard){
+    const bb=LY.billboard;
+    ctx.fillStyle="rgba(0,0,0,.14)";
+    ctx.beginPath(); ctx.ellipse(bb.x,bb.y+30,40,7,0,0,7); ctx.fill();
+    ctx.fillStyle="#5f6b74";
+    ctx.fillRect(bb.x-26,bb.y+2,5,28); ctx.fillRect(bb.x+21,bb.y+2,5,28);
+    box3(bb.x-40,bb.y-32,80,38,6,"#23303a",6);
+    ctx.fillStyle="#fff"; rr(bb.x-35,bb.y-27,70,28,4); ctx.fill();
+    ctx.fillStyle="#ff7a00"; ctx.font="800 10px -apple-system,sans-serif";
+    ctx.fillText((S.shopName||LV().name).toUpperCase().slice(0,14), bb.x, bb.y-14);
+    ctx.fillStyle="#23303a"; ctx.font="700 8.5px -apple-system,sans-serif";
+    ctx.fillText("Hüt Aktion! "+SEASON_EMOJI[season()], bb.x, bb.y-4);
+    for(let k=0;k<6;k++){
+      const on=Math.floor(now*3+k)%2===0;
+      ctx.fillStyle=on? "#ffd23f":"#6b7076";
+      ctx.beginPath(); ctx.arc(bb.x-30+k*12, bb.y-31, 2.2, 0, 7); ctx.fill();
+    }
+  }
+  // Abfall
+  ctx.font="13px -apple-system,sans-serif";
+  odirt.forEach(d=>{
+    ctx.fillStyle="rgba(0,0,0,.10)";
+    ctx.beginPath(); ctx.ellipse(d.x,d.y+4,7,3,0,0,7); ctx.fill();
+    ctx.fillText(d.em, d.x, d.y+4);
+  });
+  // Bus
+  if(BUS.active){
+    const bx=BUS.x, by=LY.roadY+5;
+    ctx.fillStyle="rgba(0,0,0,.2)";
+    ctx.beginPath(); ctx.ellipse(bx+42,by+30,44,6,0,0,7); ctx.fill();
+    ctx.fillStyle="#e8e5de"; rr(bx,by,84,30,6); ctx.fill();
+    ctx.fillStyle="#ff7a00"; rr(bx,by,84,12,6); ctx.fill();
+    ctx.fillStyle="#bfe0ee";
+    for(let k=0;k<3;k++){ rr(bx+8+k*22,by+4,16,10,2); ctx.fill(); }
+    if(BUS.state==="stop"){ ctx.fillStyle="#39444d"; rr(bx+64,by+10,14,18,2); ctx.fill(); }
+    ctx.fillStyle="#23303a"; ctx.font="800 7px -apple-system,sans-serif";
+    ctx.fillText("AARAU", bx+42, by+24);
+    ctx.fillStyle="#23303a";
+    ctx.beginPath(); ctx.arc(bx+16,by+30,5,0,7); ctx.fill();
+    ctx.beginPath(); ctx.arc(bx+68,by+30,5,0,7); ctx.fill();
+  }
+
+  /* ---- Gebäude: Räume ---- */
+  const wallCol = S.reno? "#93a8b5" : "#9aa5aa";
+  const flA = S.reno? "#efe9da" : "#e9e3d3";
+  const flB = S.reno? "#e6dfcc" : "#e2dbc8";
+  if(LY.back) drawRoom(LY.back, wallCol, flA, flB, (LY.back.hasBL?"🥩 Fleisch":"")+(LY.back.hasBL&&LY.back.hasBR?"   ·   ":"")+(LY.back.hasBR?"🧺 NonFood":""));
+  if(LY.left) drawRoom(LY.left, wallCol, flA, flB, "🥦 Gemüse");
+  if(LY.right) drawRoom(LY.right, wallCol, flA, flB, "🧀 Käse");
+  drawRoom(LY.hall, wallCol, flA, flB, null);
+  // Durchgänge freischneiden
+  ctx.fillStyle=flA;
+  if(LY.left)  ctx.fillRect(LY.hall.x-9, LY.left.doorY-24, 18, 48);
+  if(LY.right) ctx.fillRect(LY.hall.x+LY.hall.w-9, LY.right.doorY-24, 18, 48);
+  if(LY.back)  ctx.fillRect(LY.aisleX-30, LY.hall.y-9, 60, 18);
+  // Mittelgang
+  ctx.fillStyle="rgba(255,255,255,.25)";
+  ctx.fillRect(LY.aisleX-30, LY.hall.y+8, 60, LY.hall.h-16);
+  // Rückwand-Deko in der Halle
+  ctx.fillStyle="#23303a"; rr(LY.aisleX-64,LY.hall.y+64,128,20,6); ctx.fill();
+  ctx.fillStyle="#ffd23f"; ctx.font="800 10px -apple-system,sans-serif";
+  ctx.fillText("Grüezi mitenand! 👋", LY.aisleX, LY.hall.y+78);
+
+  /* ---- Lager & Personalraum ---- */
+  box3(LY.lager.x,LY.lager.y,LY.lager.w,LY.lager.h,8,"#d8cfb8",10);
+  ctx.strokeStyle="#b8ab8a"; ctx.lineWidth=1.5;
+  rr(LY.lager.x,LY.lager.y,LY.lager.w,LY.lager.h,10); ctx.stroke();
+  let lagerN=0; Object.keys(S.lager).forEach(k=>lagerN+=S.lager[k]);
+  ctx.font="12px -apple-system,sans-serif";
+  ctx.fillText("📦", LY.lager.x+18, LY.lager.y+30);
+  ctx.fillStyle="#6b5f42"; ctx.font="700 11px -apple-system,sans-serif";
+  ctx.fillText("Lager · "+lagerN+" Stk.", LY.lager.x+LY.lager.w/2+8, LY.lager.y+29);
+  const srOK=S.staffRoom>=30;
+  box3(LY.staffR.x,LY.staffR.y,LY.staffR.w,LY.staffR.h,8, srOK?"#d3dde6":"#e2c9c5",10);
+  ctx.strokeStyle= srOK?"#a8b6c2":"#c09088"; ctx.lineWidth=1.5;
+  rr(LY.staffR.x,LY.staffR.y,LY.staffR.w,LY.staffR.h,10); ctx.stroke();
+  ctx.font="11px -apple-system,sans-serif";
+  ctx.fillText(srOK?"☕":"🥴", LY.staffR.x+18, LY.staffR.y+30);
+  ctx.fillStyle="#41505c"; ctx.font="700 10.5px -apple-system,sans-serif"; ctx.textAlign="left";
+  ctx.fillText("Personalraum"+(srOK?"":" 🤢"), LY.staffR.x+34, LY.staffR.y+21);
+  ctx.fillStyle="#95a6b2"; ctx.fillRect(LY.staffR.x+34, LY.staffR.y+29, LY.staffR.w-48, 6);
+  ctx.fillStyle= srOK?"#1f8a4d":"#d33a2f";
+  ctx.fillRect(LY.staffR.x+34, LY.staffR.y+29, (LY.staffR.w-48)*S.staffRoom/100, 6);
+  ctx.textAlign="center";
+
+  /* ---- Regale ---- */
+  const act=activeSlots();
+  LY.slots.forEach(s=>{
+    if(s.zone==="hall" && parseInt(s.id.slice(1))>=S.hallShelves){
+      ctx.setLineDash([5,4]); ctx.strokeStyle="rgba(0,0,0,.16)"; ctx.lineWidth=1.5;
+      rr(s.x-45,s.y-18,90,36,8); ctx.stroke(); ctx.setLineDash([]);
+      return;
+    }
+    if(s.zone!=="hall" && !S.depts.includes(s.zone)) return;
+    const d=shelfData(s.id);
+    const st=DEPT_STYLE[s.zone==="hall"? (d.prod?P[d.prod].dept:"food") : s.zone]||DEPT_STYLE.food;
+    box3(s.x-45,s.y-18,90,36,9,st.frame,8);
+    ctx.fillStyle=st.inner; rr(s.x-41,s.y-14,82,24,6); ctx.fill();
+    if(st.cool){
+      ctx.strokeStyle="rgba(255,255,255,.8)"; ctx.lineWidth=2;
+      rr(s.x-41,s.y-14,82,24,6); ctx.stroke();
+      ctx.fillStyle="rgba(190,225,245,.35)"; rr(s.x-41,s.y-14,82,10,6); ctx.fill();
+      ctx.fillStyle="#5f88a8"; ctx.font="8px -apple-system,sans-serif";
+      ctx.fillText("❄", s.x+36, s.y-6);
+    }
+    if(d.prod){
+      const p=P[d.prod];
+      const show=Math.min(6, Math.ceil(d.units/(shelfCap()/6)));
+      ctx.font="12px -apple-system,sans-serif";
+      for(let k=0;k<show;k++){
+        const col=k%3, row=Math.floor(k/3);
+        ctx.fillText(p.emoji, s.x-24+col*24, s.y-2+row*11);
+      }
+      if(show===0){ ctx.fillStyle="rgba(0,0,0,.25)"; ctx.font="700 9px -apple-system,sans-serif"; ctx.fillText("· leer ·", s.x, s.y+1); }
+      ctx.fillStyle="rgba(0,0,0,.25)"; ctx.fillRect(s.x-41,s.y+12,82,4);
+      ctx.fillStyle= d.units===0?"#d33a2f": d.units<shelfCap()*0.3?"#e8a13a":"#1f8a4d";
+      ctx.fillRect(s.x-41,s.y+12,82*d.units/shelfCap(),4);
+      const tagX=s.side==="R"? s.x-51 : s.x+51;
+      ctx.fillStyle="#fff"; rr(tagX-14,s.y-8,28,15,3); ctx.fill();
+      ctx.strokeStyle="rgba(0,0,0,.15)"; ctx.lineWidth=1; rr(tagX-14,s.y-8,28,15,3); ctx.stroke();
+      ctx.fillStyle="#d33a2f"; ctx.font="800 8.5px -apple-system,sans-serif";
+      ctx.fillText(p.vk.toFixed(2), tagX, s.y+3);
+      if(d.units===0 && Math.sin(now*6)>0){
+        ctx.fillStyle="#d33a2f"; ctx.font="800 10px -apple-system,sans-serif";
+        ctx.fillText("LEER!", s.x, s.y-23);
+      }
+      if(p.season===season()){
+        ctx.font="9px -apple-system,sans-serif";
+        ctx.fillText(SEASON_EMOJI[season()], s.x-38, s.y-8);
+      }
+    }else{
+      ctx.fillStyle="rgba(0,0,0,.4)"; ctx.font="700 10px -apple-system,sans-serif";
+      ctx.fillText("Produkt wählen", s.x, s.y+3);
+    }
+  });
+
+  /* ---- Kassen & Self-Scans ---- */
+  for(let i=0;i<LY.kassePos.length;i++){
+    const p=LY.kassePos[i];
+    if(i>=S.kassen){
+      ctx.setLineDash([5,4]); ctx.strokeStyle="rgba(0,0,0,.16)"; ctx.lineWidth=1.5;
+      rr(p.x-30,p.y-16,60,32,8); ctx.stroke(); ctx.setLineDash([]);
+      continue;
+    }
+    box3(p.x-30,p.y-16,60,32,9,"#6e7f8c",8);
+    ctx.fillStyle="#39444d"; rr(p.x-24,p.y-10,34,20,4); ctx.fill();
+    ctx.strokeStyle="rgba(255,255,255,.25)"; ctx.lineWidth=1.5;
+    const off=(now*18)%8;
+    for(let k=0;k<5;k++){
+      const lx=p.x-22+((k*8+off)%34);
+      ctx.beginPath(); ctx.moveTo(lx,p.y-8); ctx.lineTo(lx,p.y+8); ctx.stroke();
+    }
+    ctx.font="13px -apple-system,sans-serif"; ctx.fillText("🖨️", p.x+19, p.y+1);
+    ctx.fillStyle="#fff"; ctx.font="800 8px -apple-system,sans-serif";
+    ctx.fillText("KASSE "+(i+1), p.x, p.y-21);
+    const q=queues.kasse[i];
+    if(q.length && !q[0].path.length && staffOn("kassierer")===0){
+      const pulse=0.6+0.4*Math.sin(now*5);
+      ctx.fillStyle=`rgba(255,122,0,${pulse})`;
+      ctx.font="800 11px -apple-system,sans-serif";
+      ctx.fillText("👆 TIPPEN!", p.x, p.y-32);
+    }
+  }
+  // Self-Scan-Zone: Schild + Pod-Gitter
+  if(S.selfscans>0 && LY.scanPods.length){
+    const topPod=LY.scanPods[Math.min(S.selfscans,LY.scanPods.length)-1];
+    ctx.fillStyle="#3f9089";
+    rr(LY.scanAnchor.x-52, topPod.y-34, 104, 16, 5); ctx.fill();
+    ctx.fillStyle="#fff"; ctx.font="800 8.5px -apple-system,sans-serif";
+    ctx.fillText("SELF-SCAN", LY.scanAnchor.x, topPod.y-23);
+  }
+  for(let i=0;i<LY.scanPods.length;i++){
+    const p=LY.scanPods[i];
+    if(i>=S.selfscans){
+      ctx.setLineDash([4,4]); ctx.strokeStyle="rgba(0,0,0,.13)"; ctx.lineWidth=1.5;
+      rr(p.x-20,p.y-13,40,26,6); ctx.stroke(); ctx.setLineDash([]);
+      continue;
+    }
+    box3(p.x-20,p.y-13,40,26,7,"#3f9089",6);
+    ctx.fillStyle="#0f2a28"; rr(p.x-13,p.y-9,26,14,3); ctx.fill();
+    const busy=!!p.busy;
+    ctx.fillStyle= busy? `rgba(255,210,90,${0.6+0.3*Math.sin(now*6+i)})` : `rgba(120,255,220,${0.45+0.25*Math.sin(now*3+i)})`;
+    rr(p.x-10,p.y-6,20,8,2); ctx.fill();
+  }
+
+  /* ---- Dreck innen ---- */
+  dirt.forEach(d=>{
+    ctx.fillStyle="rgba(120,95,60,.45)";
+    ctx.beginPath(); ctx.ellipse(d.x,d.y,d.r,d.r*.7,0,0,7); ctx.fill();
+    ctx.fillStyle="rgba(95,72,42,.55)";
+    ctx.beginPath(); ctx.ellipse(d.x-1,d.y,d.r*.55,d.r*.4,0,0,7); ctx.fill();
+  });
+
+  /* ---- Fassade ---- */
+  const fy=LY.hall.y+LY.hall.h-6;
+  const facade=S.reno? "#e8632a" : "#7d8a92";
+  ctx.fillStyle=facade; rr(LY.hall.x,fy,LY.hall.w,26,6); ctx.fill();
+  ctx.fillStyle="rgba(190,220,240,.85)";
+  rr(LY.hall.x+14,fy+5,LY.door.x-44-(LY.hall.x+14),16,3); ctx.fill();
+  rr(LY.door.x+44,fy+5,LY.hall.x+LY.hall.w-14-(LY.door.x+44),16,3); ctx.fill();
+  const gap=6+3*Math.sin(now*2);
+  ctx.fillStyle=shade(facade,0.7); rr(LY.door.x-42,fy+2,84,22,4); ctx.fill();
+  ctx.fillStyle="#cfe3ec";
+  ctx.fillRect(LY.door.x-38,fy+5,36-gap,16);
+  ctx.fillRect(LY.door.x+2+gap,fy+5,36-gap,16);
+  ctx.fillStyle="#5a4632"; ctx.fillRect(LY.door.x-30,fy+26,60,6);
+  const shopNm=("🛒 "+(S.shopName||LV().name)).toUpperCase();
+  const signW=Math.min(LY.hall.w-30, shopNm.length*(S.reno?9.5:8.5)+34);
+  ctx.fillStyle="rgba(0,0,0,.2)"; rr(LY.door.x-signW/2+3,fy-15,signW,26,8); ctx.fill();
+  ctx.fillStyle="#23303a"; rr(LY.door.x-signW/2,fy-18,signW,26,8); ctx.fill();
+  if(S.reno){ ctx.shadowColor="#ffb35c"; ctx.shadowBlur=10; }
+  ctx.fillStyle=S.reno? "#ffd23f" : "#ff9d3f";
+  ctx.font="800 "+(S.reno?14:12)+"px -apple-system,sans-serif";
+  ctx.fillText(shopNm, LY.door.x, fy+1);
+  ctx.shadowBlur=0;
+  if(S.reno){
+    [[LY.door.x-72,fy+34],[LY.door.x+72,fy+34]].forEach(([px,py])=>{
+      ctx.fillStyle="#a9552f"; rr(px-13,py-3,26,9,3); ctx.fill();
+      ctx.font="12px -apple-system,sans-serif"; ctx.fillText("🌷", px, py-2);
+    });
+  }
+
+  /* ---- Personal & Kunden ---- */
+  drawStaff(now,dtv);
+  customers.forEach(c=>{
+    drawPerson(c.x,c.y, c.thief?"#d33a2f":c.shirt, c.skin, c.hair,
+      {phase: c.path.length? now*9+(c.po||0) : undefined});
+    if(c.carry.length){ ctx.font="11px -apple-system,sans-serif"; ctx.fillText("🧺", c.x+11, c.y+2); }
+    if(c.angry){ ctx.font="10px -apple-system,sans-serif"; ctx.fillText("💢", c.x+8, c.y-20); }
+    if(c.state==="scanning" && c.scanT){
+      const w=26, pr=Math.min(1,c.scanT/3.5);
+      ctx.fillStyle="rgba(0,0,0,.3)"; rr(c.x-w/2,c.y-27,w,5,2.5); ctx.fill();
+      ctx.fillStyle="#7dffdc"; rr(c.x-w/2,c.y-27,w*pr,5,2.5); ctx.fill();
+    }
+  });
+  effects.forEach(e=>{
+    ctx.globalAlpha=Math.min(1,e.t);
+    ctx.fillStyle=e.col; ctx.font="800 12px -apple-system,sans-serif";
+    ctx.fillText(e.txt, e.x, e.y);
+    ctx.globalAlpha=1;
+  });
+  /* ---- Abendstimmung ---- */
+  const prog=S.t/dayLen();
+  if(prog>0.72){
+    const a=(prog-0.72);
+    ctx.fillStyle=`rgba(255,140,50,${a*0.4})`; ctx.fillRect(cam.x-50,cam.y-50,stW/sc+100,stH/sc+100);
+    ctx.fillStyle=`rgba(30,30,70,${a*0.4})`; ctx.fillRect(cam.x-50,cam.y-50,stW/sc+100,stH/sc+100);
+  }
+}
+
+/* ================= EINGABE (Wischen + Tippen) ================= */
+const PTR={down:false, sx:0, sy:0, cx0:0, cy0:0, dragged:false, hinted:false};
+cv.addEventListener("pointerdown", ev=>{
+  PTR.down=true; PTR.dragged=false;
+  PTR.sx=ev.clientX; PTR.sy=ev.clientY;
+  PTR.cx0=cam.x; PTR.cy0=cam.y;
+});
+cv.addEventListener("pointermove", ev=>{
+  if(!PTR.down) return;
+  const dx=ev.clientX-PTR.sx, dy=ev.clientY-PTR.sy;
+  if(Math.hypot(dx,dy)>8){
+    PTR.dragged=true;
+    if(!PTR.hinted){ PTR.hinted=true; $("panHint").style.opacity=0; }
+  }
+  if(PTR.dragged){
+    cam.x=PTR.cx0-dx/sc; cam.y=PTR.cy0-dy/sc;
+    clampCam();
+  }
+});
+window.addEventListener("pointerup", ev=>{
+  if(!PTR.down) return;
+  PTR.down=false;
+  if(PTR.dragged) return;
+  const r=cv.getBoundingClientRect();
+  const x=(ev.clientX-r.left)/sc+cam.x, y=(ev.clientY-r.top)/sc+cam.y;
+  handleTap(x,y);
+});
+function handleTap(x,y){
+  // Aussen
+  if(y>LY.plazaTop-6){
+    for(let i=odirt.length-1;i>=0;i--){
+      const d=odirt[i];
+      if(Math.hypot(x-d.x,y-d.y)<18){
+        odirt.splice(i,1);
+        effects.push({x:d.x,y:d.y-10,txt:"✨",t:0.9,col:"#41505c"});
+        return;
+      }
+    }
+    if(S.billboard && Math.abs(x-LY.billboard.x)<45 && Math.abs(y-LY.billboard.y)<38){
+      toast("📣 Deine Werbetafel lockt Kundschaft an (20/Tag)."); return;
+    }
+    if(S.busstop && Math.abs(x-LY.busStop.x)<55 && Math.abs(y-LY.busStop.y)<40){
+      toast("🚌 Der Bus bringt regelmässig Kundengruppen."); return;
+    }
+    return;
+  }
+  // Innen
+  for(let i=dirt.length-1;i>=0;i--){
+    const d=dirt[i];
+    if(Math.hypot(x-d.x,y-d.y)<d.r+14){
+      dirt.splice(i,1);
+      effects.push({x:d.x,y:d.y-8,txt:"✨",t:0.9,col:"#41505c"});
+      return;
+    }
+  }
+  for(let i=0;i<S.kassen;i++){
+    const p=LY.kassePos[i];
+    if(Math.abs(x-p.x)<38 && Math.abs(y-p.y)<26){
+      const q=queues.kasse[i];
+      if(q.length && !q[0].path.length){ checkout(q[0],false); }
+      else toast("Niemand an der Kasse.");
+      return;
+    }
+  }
+  const st=LY.staffR;
+  if(x>st.x && x<st.x+st.w && y>st.y && y<st.y+st.h){
+    if(S.staffRoom<95){ S.staffRoom=100; toast("☕ Personalraum geputzt – Team happy!"); }
+    else toast("Der Personalraum ist schon sauber.");
+    return;
+  }
+  const lg=LY.lager;
+  if(x>lg.x && x<lg.x+lg.w && y>lg.y && y<lg.y+lg.h){ openPanel("einkauf"); return; }
+  for(const s of activeSlots()){
+    if(Math.abs(x-s.x)<50 && Math.abs(y-s.y)<24){ openShelf(s.id); return; }
+  }
+}
+
+/* ================= PANELS & DIALOGE ================= */
+function showDialog(html){ $("dialogBox").innerHTML=html; $("dialogWrap").classList.add("show"); }
+function closeDialog(){ $("dialogWrap").classList.remove("show"); }
+window.closeDialog=closeDialog;
+window.startNextDay=startNextDay;
+
+let currentPanel=null;
+function openPanel(name){
+  currentPanel=name;
+  document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("active", b.dataset.panel===name));
+  if(name==="laden"){ closePanel(); return; }
+  renderPanel();
+  $("panelOverlay").classList.add("show");
+}
+function closePanel(){
+  currentPanel=null;
+  $("panelOverlay").classList.remove("show");
+  document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("active", b.dataset.panel==="laden"));
+}
+$("panelClose").onclick=closePanel;
+$("panelOverlay").addEventListener("pointerdown",e=>{ if(e.target===$("panelOverlay")) closePanel(); });
+document.querySelectorAll("#nav button").forEach(b=>{ b.onclick=()=>openPanel(b.dataset.panel); });
+function renderPanel(){
+  if(currentPanel==="einkauf") renderEinkauf();
+  else if(currentPanel==="sortiment") renderSortiment();
+  else if(currentPanel==="personal") renderPersonal();
+  else if(currentPanel==="ausbau") renderAusbau();
+}
+
+/* ---- Einkauf ---- */
+function renderEinkauf(){
+  $("panelTitle").textContent="📦 Wareneinkauf";
+  $("panelSub").textContent="Ware kommt direkt ins Lager";
+  let html="";
+  S.assortment.forEach(id=>{
+    const p=P[id];
+    const inSeason=p.season && p.season===season();
+    html+=`<div class="row">
+      <div class="em">${p.emoji}</div>
+      <div class="info"><b>${p.name}${inSeason?'<span class="tag season">Saison!</span>':''}</b>
+      <small>Lager: ${S.lager[id]||0} Stk. · EK ${fmt(p.ek)} → VK ${fmt(p.vk)}</small></div>
+      <button class="btn sec" onclick="buyStock('${id}',10)">+10<br><small>${fmtS(p.ek*10)}</small></button>
+      <button class="btn" onclick="buyStock('${id}',25)">+25<br><small>${fmtS(p.ek*25)}</small></button>
+    </div>`;
+  });
+  $("panelBody").innerHTML=html || "<p style='padding:20px;text-align:center;color:var(--ink-soft)'>Kein Sortiment – füge unter «Sortiment» Produkte hinzu.</p>";
+}
+window.buyStock=function(id,n){
+  const c=P[id].ek*n;
+  if(S.money<c){ toast("💸 Zu wenig Geld!"); return; }
+  S.money-=c; S.dayLog.buys+=c;
+  S.lager[id]=(S.lager[id]||0)+n;
+  toast(`📦 ${n}× ${P[id].name} ins Lager geliefert`);
+  renderPanel(); save();
+};
+
+/* ---- Sortiment ---- */
+function renderSortiment(){
+  $("panelTitle").textContent="🏷️ Sortiment";
+  $("panelSub").textContent=`${SEASON_EMOJI[season()]} Aktuelle Saison: ${season()}`;
+  let html="<div class='secTitle'>Im Sortiment</div>";
+  S.assortment.forEach(id=>{
+    const p=P[id], st=S.stats[id];
+    const flop=st.yesterday===0 && st.total>0 && S.day>1;
+    const hit=st.yesterday>=8;
+    html+=`<div class="row">
+      <div class="em">${p.emoji}</div>
+      <div class="info"><b>${p.name}${p.season?`<span class="tag ${p.season===season()?'season':''}">${SEASON_EMOJI[p.season]} ${p.season}</span>`:""}${flop?'<span class="tag flop">Ladenhüter</span>':hit?'<span class="tag hit">läuft!</span>':""}</b>
+      <small>Gestern: ${st.yesterday}× · Total: ${st.total}× verkauft</small></div>
+      <button class="btn danger" onclick="dropProduct('${id}')">Rauswerfen</button>
+    </div>`;
+  });
+  html+="<div class='secTitle'>Verfügbare Produkte</div>";
+  PRODUCTS.forEach(p=>{
+    if(S.assortment.includes(p.id)) return;
+    const unlocked=S.depts.includes(p.dept);
+    html+=`<div class="row" style="${unlocked?"":"opacity:.45"}">
+      <div class="em">${p.emoji}</div>
+      <div class="info"><b>${p.name}${p.season?`<span class="tag ${p.season===season()?'season':''}">${SEASON_EMOJI[p.season]} ${p.season}</span>`:""}</b>
+      <small>${DEPTS[p.dept].emoji} ${DEPTS[p.dept].name} · EK ${fmt(p.ek)} → VK ${fmt(p.vk)}</small></div>
+      ${unlocked
+        ? `<button class="btn green" onclick="addProduct('${p.id}')">Aufnehmen</button>`
+        : `<span class="tag">🔒 ${DEPTS[p.dept].name}</span>`}
+    </div>`;
+  });
+  $("panelBody").innerHTML=html;
+}
+window.addProduct=function(id){
+  if(!S.assortment.includes(id)) S.assortment.push(id);
+  ensureStats();
+  toast(`✅ ${P[id].name} ist neu im Sortiment`);
+  renderPanel(); save();
+};
+window.dropProduct=function(id){
+  S.assortment=S.assortment.filter(x=>x!==id);
+  delete S.lager[id];
+  Object.keys(S.shelves).forEach(k=>{
+    if(S.shelves[k].prod===id){ S.shelves[k].prod=null; S.shelves[k].units=0; }
+  });
+  toast(`🗑️ ${P[id].name} aus dem Sortiment geworfen`);
+  renderPanel(); save();
+};
+
+/* ---- Personal ---- */
+function renderPersonal(){
+  $("panelTitle").textContent="🧑‍💼 Personal";
+  $("panelSub").textContent=`Löhne total: ${fmtS(wagesPerDay())}/Tag`;
+  let html="";
+  Object.keys(STAFF).forEach(k=>{
+    const st=STAFF[k];
+    const r=shiftRange(k), hrs=shiftHours(k);
+    const wage=Math.round(st.wage*Math.max(0,pricedHours(r[0],r[1]))/12);
+    html+=`<div class="row">
+      <div class="em">${st.emoji}</div>
+      <div class="info"><b>${st.name} <span class="tag">${S.staff[k]}×</span></b>
+      <small>${st.desc}</small>
+      <small>Schicht: ${String(r[0]).padStart(2,"0")}–${String(r[1]).padStart(2,"0")} Uhr (${hrs}h) · ${fmtS(wage)}/Tag pro Person</small></div>
+      <button class="btn sec" onclick="fire('${k}')" ${S.staff[k]?"":"disabled"}>−</button>
+      <button class="btn" onclick="hire('${k}')">+</button>
+    </div>
+    <div class="row" style="padding-top:2px">
+      <div class="em" style="font-size:14px;color:var(--ink-soft)">⏰</div>
+      <div class="info" style="display:flex;gap:6px;flex-wrap:wrap">
+        ${Object.keys(SHIFTS).map(s=>`<button class="btn ${ (S.staffShift[k]||"full")===s?"":"sec" }" style="padding:7px 10px" onclick="setShift('${k}','${s}')">${SHIFTS[s].emoji} ${SHIFTS[s].name}</button>`).join("")}
+      </div>
+    </div>`;
+  });
+  html+=`<div class="secTitle">Tipp</div>
+  <p style="font-size:12.5px;color:var(--ink-soft);padding:0 4px 8px">
+  Am Anfang machst du alles selbst. Schichten sparen Lohn: Wer nur am Vormittag oder Nachmittag arbeitet, kostet auch nur diese Stunden.
+  Randstunden (vor 08:00 / nach 20:00) haben 50% Zuschlag. Und halte den Personalraum sauber, sonst arbeitet das Team nur halb so schnell! 🤢</p>`;
+  $("panelBody").innerHTML=html;
+}
+window.setShift=function(k,s){
+  S.staffShift[k]=s;
+  toast(`⏰ ${STAFF[k].name}: ${SHIFTS[s].name}-Schicht`);
+  renderPanel(); save();
+};
+window.hire=function(k){
+  S.staff[k]++;
+  toast(`${STAFF[k].emoji} ${STAFF[k].name} angestellt`);
+  renderPanel(); save();
+};
+window.fire=function(k){
+  if(S.staff[k]>0) S.staff[k]--;
+  toast(`${STAFF[k].name} entlassen`);
+  renderPanel(); save();
+};
+
+/* ---- Ausbau ---- */
+function shelfPrice(){ return cost(100 + (S.hallShelves-2)*60); }
+window.setOpen=function(d){
+  const v=S.openH+d;
+  if(v<0||v>12||S.closeH-v<4){ toast("Öffnung: 00–12 Uhr, mind. 4h offen."); return; }
+  const f=S.t/dayLen(); S.openH=v; S.t=f*dayLen();
+  renderPanel(); save();
+};
+window.setClose=function(d){
+  const v=S.closeH+d;
+  if(v<13||v>24||v-S.openH<4){ toast("Schluss: 13–24 Uhr, mind. 4h offen."); return; }
+  const f=S.t/dayLen(); S.closeH=v; S.t=f*dayLen();
+  renderPanel(); save();
+};
+function renderAusbau(){
+  const L=LV(), pct=Math.round(completion()*100);
+  $("panelTitle").textContent="🏗️ Ausbau";
+  $("panelSub").textContent=`${L.name} (Level ${S.level+1}/5) · ${pct}% ausgebaut`;
+  let html=`<div class="progress"><i style="width:${pct}%"></i></div>`;
+  if(pct>=100 && S.level<4){
+    html+=`<div class="row"><div class="em">🚚</div>
+      <div class="info"><b>Umzug: ${LEVELS[S.level+1].name}</b>
+      <small>Alles ist ausgebaut! Der nächste, grössere Laden wartet.</small></div>
+      <button class="btn green" onclick="offerMove()">${fmtS(L.moveCost)}</button></div>`;
+  }else if(pct>=100){
+    html+=`<div class="row"><div class="em">🏆</div>
+      <div class="info"><b>MEGA-MÄRT komplett!</b>
+      <small>Du hast das grösste Level erreicht. Chapeau, Tycoon!</small></div></div>`;
+  }
+  const span=S.closeH-S.openH;
+  html+=`<div class="secTitle">Öffnungszeiten ${span>=24?'<span class="tag hit">🌙 24h-Shop!</span>':`<span class="tag">${span}h offen</span>`}</div>
+  <div class="row"><div class="em">🌅</div>
+    <div class="info"><b>Öffnung</b><small>Stunde für Stunde früher – bis Mitternacht. Zuschlag vor 08:00.</small></div>
+    <div class="hourCtl"><button class="btn sec" onclick="setOpen(-1)">−</button><b>${String(S.openH).padStart(2,"0")}:00</b><button class="btn sec" onclick="setOpen(1)">+</button></div>
+  </div>
+  <div class="row"><div class="em">🌆</div>
+    <div class="info"><b>Ladenschluss</b><small>Länger offen = mehr Kundschaft. Zuschlag nach 20:00. Lohnfaktor: ${Math.round(hoursFactor()*100)}%.</small></div>
+    <div class="hourCtl"><button class="btn sec" onclick="setClose(-1)">−</button><b>${String(S.closeH).padStart(2,"0")}:00</b><button class="btn sec" onclick="setClose(1)">+</button></div>
+  </div>
+  <div class="row"><div class="em">✏️</div>
+    <div class="info"><b>${S.shopName||"Dein Laden"}</b><small>Ladenname ändern – steht gross über dem Eingang.</small></div>
+    <button class="btn sec" onclick="askName(1)">Umbenennen</button>
+  </div>`;
+  html+="<div class='secTitle'>Einrichtung</div>";
+  html+=`<div class="row"><div class="em">🗄️</div>
+    <div class="info"><b>Neues Regal (Halle) <span class="tag">${S.hallShelves}/${L.hallSlots}</span></b>
+    <small>Mehr Regale = mehr Produkte gleichzeitig im Verkauf.</small></div>
+    <button class="btn" onclick="buyShelf()" ${S.hallShelves>=L.hallSlots?"disabled":""}>${fmtS(shelfPrice())}</button></div>`;
+  html+=`<div class="row"><div class="em">🧾</div>
+    <div class="info"><b>Kasse <span class="tag">${S.kassen}/${L.maxK}</span></b>
+    <small>Kürzere Warteschlangen, weniger genervte Kunden.</small></div>
+    <button class="btn" onclick="buyKasse()" ${S.kassen>=L.maxK?"disabled":""}>${fmtS(cost(300))}</button></div>`;
+  html+=`<div class="row"><div class="em">🖥️</div>
+    <div class="info"><b>Self-Scanning <span class="tag">${S.selfscans}/${L.maxS}</span></b>
+    <small>Kassiert automatisch – Diebstahl-Risiko: ${Math.round(theftChance()*100)}%.</small></div>
+    <button class="btn" onclick="buyScan()" ${S.selfscans>=L.maxS?"disabled":""}>${fmtS(cost(180))}</button></div>`;
+  html+="<div class='secTitle'>Anbauten (der Laden wächst!)</div>";
+  const WING_LABEL={gemuese:"Anbau links", kaese:"Anbau rechts", fleisch:"Anbau hinten links", nonfood:"Anbau hinten rechts"};
+  Object.keys(DEPTS).forEach(k=>{
+    if(k==="food") return;
+    const d=DEPTS[k], owned=S.depts.includes(k);
+    html+=`<div class="row">
+      <div class="em">${d.emoji}</div>
+      <div class="info"><b>Abteilung ${d.name}</b>
+      <small>${WING_LABEL[k]} – mit eigenen Regalen & ${PRODUCTS.filter(p=>p.dept===k).length} neuen Produkten.</small></div>
+      ${owned?'<span class="tag hit">✓ gebaut</span>':`<button class="btn" onclick="buyDept('${k}')">${fmtS(cost(d.cost))}</button>`}
+    </div>`;
+  });
+  html+="<div class='secTitle'>Aussenbereich & Extras</div>";
+  html+=`<div class="row"><div class="em">📣</div>
+    <div class="info"><b>Werbetafel</b><small>+35% Kundschaft. Laufende Kosten: ${fmtS(20)}/Tag.</small></div>
+    ${S.billboard?'<span class="tag hit">✓ aktiv</span>':`<button class="btn" onclick="buyBillboard()">${fmtS(cost(150))}</button>`}</div>`;
+  html+=`<div class="row"><div class="em">🚌</div>
+    <div class="info"><b>Bushaltestelle</b><small>Der Bus bringt regelmässig ganze Kundengruppen.</small></div>
+    ${S.busstop?'<span class="tag hit">✓ gebaut</span>':`<button class="btn" onclick="buyBusstop()">${fmtS(cost(400))}</button>`}</div>`;
+  html+=`<div class="row"><div class="em">✨</div>
+    <div class="info"><b>Laden-Renovation</b><small>Neue Fassade, Leuchtschild, schöner Boden & Blumentröge.</small></div>
+    ${S.reno?'<span class="tag hit">✓ renoviert</span>':`<button class="btn" onclick="buyReno()">${fmtS(cost(500))}</button>`}</div>`;
+  $("panelBody").innerHTML=html;
+}
+window.offerMove=offerMove;
+function pay(c){
+  if(S.money<c){ toast("💸 Zu wenig Geld!"); return false; }
+  S.money-=c; return true;
+}
+window.buyShelf=function(){
+  if(S.hallShelves>=LV().hallSlots) return;
+  if(!pay(shelfPrice())) return;
+  S.hallShelves++;
+  toast("🗄️ Neues Regal aufgebaut – tippe es an, um ein Produkt zu wählen!");
+  renderPanel(); save();
+};
+window.buyKasse=function(){ if(S.kassen<LV().maxK && pay(cost(300))){ S.kassen++; toast("🧾 Neue Kasse eröffnet!"); renderPanel(); save(); } };
+window.buyScan=function(){ if(S.selfscans<LV().maxS && pay(cost(180))){ S.selfscans++; toast("🖥️ Neuer Self-Scanning-Automat!"); renderPanel(); save(); } };
+window.buyDept=function(k){
+  if(S.depts.includes(k)) return;
+  if(!pay(cost(DEPTS[k].cost))) return;
+  S.depts.push(k);
+  buildLayout();
+  toast(`${DEPTS[k].emoji} Abteilung ${DEPTS[k].name} angebaut – dein Laden ist gewachsen! 🏗️`, true);
+  renderPanel(); save();
+};
+window.buyBillboard=function(){ if(!S.billboard && pay(cost(150))){ S.billboard=true; toast("📣 Werbetafel steht – die Leute reden über dich!"); renderPanel(); save(); } };
+window.buyBusstop=function(){ if(!S.busstop && pay(cost(400))){ S.busstop=true; R.bus=8; toast("🚌 Bushaltestelle gebaut – der erste Bus kommt gleich!"); renderPanel(); save(); } };
+window.buyReno=function(){ if(!S.reno && pay(cost(500))){ S.reno=true; toast("✨ Frisch renoviert – dein Laden glänzt!"); renderPanel(); save(); } };
+
+/* ---- Regal-Popup ---- */
+function openShelf(id){
+  const slot=slotById(id);
+  const d=shelfData(id);
+  const zoneName = slot.zone==="hall" ? "Halle" : DEPTS[slot.zone].emoji+" "+DEPTS[slot.zone].name;
+  let html=`<h2>🗄️ Regal (${zoneName})</h2>`;
+  if(d.prod){
+    const p=P[d.prod];
+    const lag=S.lager[d.prod]||0;
+    html+=`<div class="sub">${p.emoji} ${p.name} · ${d.units}/${shelfCap()} im Regal · ${lag} im Lager</div>
+    <button class="btn green" onclick="refill('${id}')" ${lag<=0||d.units>=shelfCap()?"disabled":""}>📦 Auffüllen (aus dem Lager)</button>
+    <button class="btn sec" style="width:100%;margin-top:8px" onclick="clearShelf('${id}')">Produkt wechseln</button>`;
+    if(lag<=0) html+=`<p style="font-size:12px;color:var(--ink-soft);margin-top:10px">Kein Lagerbestand – bestelle Nachschub unter «Einkauf».</p>`;
+  }else{
+    html+=`<div class="sub">Welches Produkt soll hier verkauft werden?</div>`;
+    const taken=new Set(Object.values(S.shelves).map(x=>x.prod).filter(Boolean));
+    const options=S.assortment.filter(pid=>{
+      if(taken.has(pid)) return false;
+      if(slot.zone==="hall") return S.depts.includes(P[pid].dept);
+      return P[pid].dept===slot.zone;
+    });
+    if(options.length){
+      options.forEach(pid=>{
+        const p=P[pid];
+        html+=`<div class="row"><div class="em">${p.emoji}</div>
+        <div class="info"><b>${p.name}</b><small>Lager: ${S.lager[pid]||0} Stk.</small></div>
+        <button class="btn" onclick="assignShelf('${id}','${pid}')">Wählen</button></div>`;
+      });
+    }else{
+      html+=`<p style="font-size:13px;color:var(--ink-soft)">Kein passendes freies Produkt. Nimm unter «Sortiment» neue ${slot.zone==="hall"?"Produkte":DEPTS[slot.zone].name+"-Produkte"} auf.</p>`;
+    }
+  }
+  html+=`<button class="btn sec" style="margin-top:10px" onclick="closeDialog()">Schliessen</button>`;
+  showDialog(html);
+}
+window.refill=function(id){
+  const d=shelfData(id);
+  const lag=S.lager[d.prod]||0;
+  const n=Math.min(shelfCap()-d.units, lag);
+  d.units+=n; S.lager[d.prod]-=n;
+  const slot=slotById(id);
+  effects.push({x:slot.x,y:slot.y-24,txt:"+"+n+" 📦",t:1.2,col:"#1f8a4d"});
+  closeDialog(); save();
+};
+window.assignShelf=function(id,pid){
+  const d=shelfData(id);
+  d.prod=pid; d.units=0;
+  closeDialog(); openShelf(id);
+};
+window.clearShelf=function(id){
+  const d=shelfData(id);
+  if(d.prod && d.units>0){ S.lager[d.prod]=(S.lager[d.prod]||0)+d.units; }
+  d.prod=null; d.units=0;
+  closeDialog(); openShelf(id);
+};
+
+/* ================= LADENNAME ================= */
+function askName(renaming){
+  paused=true;
+  showDialog(`
+    <h2>🏪 ${renaming?"Neuer Ladenname":"Wie soll dein Laden heissen?"}</h2>
+    <div class="sub">Der Name steht gross über dem Eingang – und auf deiner Werbetafel.</div>
+    <input id="nameInput" maxlength="18" placeholder="z.B. Joels Märt"
+      value="${(S.shopName||"").replace(/["<>]/g,"")}"
+      style="width:100%;padding:12px;border:2px solid #dde3e6;border-radius:12px;font:inherit;font-size:15px">
+    <button class="btn" onclick="saveName(${renaming?1:0})">Übernehmen ✓</button>
+  `);
+  setTimeout(()=>{ const el=$("nameInput"); if(el) el.focus(); }, 60);
+}
+window.askName=askName;
+window.saveName=function(renaming){
+  const el=$("nameInput");
+  const v=el? el.value.trim().slice(0,18) : "";
+  S.shopName = v || "Min Märt";
+  save(); closeDialog();
+  if(!renaming && !S.tutorialDone){ tutorial(); }
+  else{ paused=false; toast("🏪 "+S.shopName); if(currentPanel) renderPanel(); }
+};
+
+/* ================= HUD & LOOP ================= */
+function updateHUD(){
+  $("uiMoney").textContent=fmtS(S.money);
+  $("uiDay").textContent=(S.shopName?S.shopName+" · ":"")+`Tag ${S.day}`;
+  $("uiDay").title=season();
+  $("uiClock").textContent=clockStr()+" · "+SEASON_EMOJI[season()]+" · Lv."+(S.level+1);
+  $("uiClean").style.width=cleanPct()+"%";
+  $("uiClean").style.background = cleanPct()>50 ? "var(--green)" : cleanPct()>25 ? "#e8a13a" : "var(--red)";
+}
+let last=performance.now();
+function loop(now){
+  const dt=Math.min(0.1,(now-last)/1000); last=now;
+  tick(dt);
+  render();
+  updateHUD();
+  requestAnimationFrame(loop);
+}
+
+/* ================= START ================= */
+function tutorial(){
+  showDialog(`
+    <h2>🛒 Willkommen im Märt-Tycoon!</h2>
+    <div class="sub">Vom Dorflädeli zum MEGA-MÄRT – 5 Level warten auf dich.</div>
+    <div class="stat"><span>👆 Wischen</span><b>Umherschauen im Laden</b></div>
+    <div class="stat"><span>🗄️ Regal antippen</span><b>Auffüllen</b></div>
+    <div class="stat"><span>🧾 Kasse antippen</span><b>Kassieren</b></div>
+    <div class="stat"><span>🟤 Dreck & 🍂 Abfall</span><b>Antippen = putzen</b></div>
+    <div class="stat"><span>🚶 Dreckiger Vorplatz</span><b>Leute laufen am Laden vorbei!</b></div>
+    <div class="stat"><span>🍽️ Mittag</span><b>Der grosse Rush – Regale vorher füllen!</b></div>
+    <div class="stat"><span>🧍 Am Anfang</span><b>Bist du ganz allein!</b></div>
+    <p style="font-size:12.5px;color:var(--ink-soft);margin-top:10px">
+    Bau alles auf 100% aus, dann geht's in den nächsten, grösseren Laden.
+    Verdient wird nur über Verkäufe. Viel Erfolg! 💪</p>
+    <button class="btn" onclick="closeDialog();S.tutorialDone=true;paused=false;save();">Laden öffnen ▶</button>
+  `);
+  paused=true;
+}
+function boot(){
+  const hadSave=load();
+  ensureStats();
+  buildLayout();
+  resize();
+  camCenterDoor();
+  requestAnimationFrame(loop);
+  if(!S.shopName){ askName(0); }
+  else if(!hadSave || !S.tutorialDone){ tutorial(); }
+  else{ offlineSim(); }
+  if(!canStore) toast("⚠️ Speichern hier nicht möglich – auf GitHub Pages klappt's!");
+  setTimeout(()=>{ if(!PTR.hinted) $("panHint").style.opacity=0; }, 8000);
+}
+document.addEventListener("visibilitychange",()=>{ if(document.hidden) save(); });
+window.addEventListener("pagehide",save);
+boot();
+</script>
+</body>
+</html>
