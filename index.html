@@ -7,7 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#23303a">
-<title>Märt-Tycoon</title>
+<title>Markt-Tycoon · by Nextform Games</title>
 <style>
 :root{
   --bg:#eef0ee; --panel:#ffffff; --ink:#23303a; --ink-soft:#5b6b76;
@@ -138,6 +138,7 @@ canvas{display:block;touch-action:none;position:absolute;left:50%;top:50%;transf
   <button data-panel="sortiment"><span class="ic">🏷️</span>Sortiment</button>
   <button data-panel="personal"><span class="ic">🧑‍💼</span>Personal</button>
   <button data-panel="ausbau"><span class="ic">🏗️</span>Ausbau</button>
+  <button data-panel="finanzen"><span class="ic">💰</span>Finanzen</button>
 </div>
 
 <div class="overlay" id="panelOverlay">
@@ -162,11 +163,11 @@ const SEASON_EMOJI = {Frühling:"🌸",Sommer:"☀️",Herbst:"🍂",Winter:"❄
 const OFFLINE_CAP = 7200;
 
 const LEVELS=[
-  {name:"Dorflädeli",       mult:1.0, hallW:400, hallH:460, hallSlots:6,  wingSlots:4, backHalf:3, maxK:2,  maxS:2,  moveCost:2000},
-  {name:"Quartier-Märt",    mult:1.6, hallW:460, hallH:520, hallSlots:8,  wingSlots:5, backHalf:4, maxK:3,  maxS:4,  moveCost:6000},
+  {name:"Dorfladen",         mult:1.0, hallW:400, hallH:460, hallSlots:6,  wingSlots:4, backHalf:3, maxK:2,  maxS:2,  moveCost:2000},
+  {name:"Stadtteil-Markt",  mult:1.6, hallW:460, hallH:520, hallSlots:8,  wingSlots:5, backHalf:4, maxK:3,  maxS:4,  moveCost:6000},
   {name:"Stadt-Supermarkt", mult:2.4, hallW:520, hallH:600, hallSlots:10, wingSlots:6, backHalf:5, maxK:5,  maxS:8,  moveCost:15000},
   {name:"Einkaufscenter",   mult:3.4, hallW:600, hallH:700, hallSlots:12, wingSlots:7, backHalf:6, maxK:7,  maxS:16, moveCost:35000},
-  {name:"24h XL-MEGA-MÄRT", mult:4.8, hallW:680, hallH:800, hallSlots:14, wingSlots:8, backHalf:7, maxK:10, maxS:30, moveCost:0},
+  {name:"24h XL-MEGA-MARKT", mult:4.8, hallW:680, hallH:800, hallSlots:14, wingSlots:8, backHalf:7, maxK:10, maxS:30, moveCost:0},
 ];
 function LV(){ return LEVELS[S.level]; }
 function cost(base){ return Math.round(base*LV().mult); }
@@ -180,29 +181,74 @@ const DEPTS = {
 };
 
 const PRODUCTS = [
+  /* ---- Food (16) ---- */
   {id:"brot",       name:"Brot",            emoji:"🍞", dept:"food",    ek:1.0, vk:2.2,  pop:8},
   {id:"milch",      name:"Milch",           emoji:"🥛", dept:"food",    ek:0.8, vk:1.6,  pop:9},
   {id:"pasta",      name:"Pasta",           emoji:"🍝", dept:"food",    ek:0.9, vk:1.9,  pop:7},
-  {id:"schoggi",    name:"Schoggi",         emoji:"🍫", dept:"food",    ek:1.5, vk:3.2,  pop:8},
+  {id:"schoggi",    name:"Schokolade",       emoji:"🍫", dept:"food",    ek:1.5, vk:3.2,  pop:8},
   {id:"kaffee",     name:"Kaffee",          emoji:"☕", dept:"food",    ek:3.5, vk:6.9,  pop:6},
   {id:"chips",      name:"Chips",           emoji:"🥔", dept:"food",    ek:1.2, vk:2.8,  pop:7},
-  {id:"glace",      name:"Glacé",           emoji:"🍦", dept:"food",    ek:1.5, vk:3.5,  pop:7, season:"Sommer"},
+  {id:"reis",       name:"Reis",            emoji:"🍚", dept:"food",    ek:1.1, vk:2.4,  pop:6},
+  {id:"muesli",     name:"Müesli",          emoji:"🥣", dept:"food",    ek:2.2, vk:4.5,  pop:6},
+  {id:"zopf",       name:"Sonntagszopf",    emoji:"🥖", dept:"food",    ek:1.8, vk:3.9,  pop:6},
+  {id:"guetzli",    name:"Kekse",            emoji:"🍪", dept:"food",    ek:1.4, vk:3.2,  pop:6},
+  {id:"mineral",    name:"Mineralwasser",   emoji:"💧", dept:"food",    ek:0.5, vk:1.2,  pop:8},
+  {id:"honig",      name:"Honig",           emoji:"🍯", dept:"food",    ek:3.0, vk:6.5,  pop:4},
+  {id:"glace",      name:"Eiscreme",         emoji:"🍦", dept:"food",    ek:1.5, vk:3.5,  pop:7, season:"Sommer"},
+  {id:"eistee",     name:"Eistee",          emoji:"🧃", dept:"food",    ek:0.8, vk:1.9,  pop:7, season:"Sommer"},
+  {id:"suppe",      name:"Suppenbeutel",    emoji:"🥫", dept:"food",    ek:1.0, vk:2.4,  pop:5, season:"Winter"},
   {id:"fondue",     name:"Fonduemischung",  emoji:"🫕", dept:"food",    ek:6.0, vk:11.9, pop:7, season:"Winter"},
+  /* ---- Gemüse & Früchte (14) ---- */
   {id:"aepfel",     name:"Äpfel",           emoji:"🍎", dept:"gemuese", ek:1.0, vk:2.4,  pop:8},
   {id:"bananen",    name:"Bananen",         emoji:"🍌", dept:"gemuese", ek:0.9, vk:2.1,  pop:8},
   {id:"tomaten",    name:"Tomaten",         emoji:"🍅", dept:"gemuese", ek:1.2, vk:2.9,  pop:7},
   {id:"salat",      name:"Salat",           emoji:"🥬", dept:"gemuese", ek:0.8, vk:2.0,  pop:6},
+  {id:"rueebli",    name:"Karotten",         emoji:"🥕", dept:"gemuese", ek:0.7, vk:1.8,  pop:7},
+  {id:"kartoffeln", name:"Kartoffeln",      emoji:"🥔", dept:"gemuese", ek:0.9, vk:2.2,  pop:7},
+  {id:"zwiebeln",   name:"Zwiebeln",        emoji:"🧅", dept:"gemuese", ek:0.6, vk:1.5,  pop:5},
+  {id:"gurken",     name:"Gurken",          emoji:"🥒", dept:"gemuese", ek:0.8, vk:1.9,  pop:6},
+  {id:"peperoni",   name:"Paprika",          emoji:"🫑", dept:"gemuese", ek:1.1, vk:2.6,  pop:6},
+  {id:"brokkoli",   name:"Brokkoli",        emoji:"🥦", dept:"gemuese", ek:1.2, vk:2.8,  pop:5},
+  {id:"zitronen",   name:"Zitronen",        emoji:"🍋", dept:"gemuese", ek:0.9, vk:2.2,  pop:5},
   {id:"erdbeeren",  name:"Erdbeeren",       emoji:"🍓", dept:"gemuese", ek:2.0, vk:4.5,  pop:8, season:"Frühling"},
+  {id:"trauben",    name:"Trauben",         emoji:"🍇", dept:"gemuese", ek:2.2, vk:4.9,  pop:6, season:"Herbst"},
   {id:"kuerbis",    name:"Kürbis",          emoji:"🎃", dept:"gemuese", ek:1.5, vk:3.5,  pop:6, season:"Herbst"},
+  /* ---- Käse & Molkerei (11) ---- */
   {id:"gruyere",    name:"Gruyère",         emoji:"🧀", dept:"kaese",   ek:3.0, vk:5.9,  pop:7},
   {id:"mozzarella", name:"Mozzarella",      emoji:"🫓", dept:"kaese",   ek:1.5, vk:3.2,  pop:6},
+  {id:"emmentaler", name:"Emmentaler",      emoji:"🧀", dept:"kaese",   ek:2.8, vk:5.5,  pop:6},
+  {id:"tilsiter",   name:"Tilsiter",        emoji:"🧀", dept:"kaese",   ek:2.5, vk:4.9,  pop:5},
+  {id:"brie",       name:"Brie",            emoji:"🧀", dept:"kaese",   ek:2.6, vk:5.2,  pop:5},
+  {id:"butter",     name:"Butter",          emoji:"🧈", dept:"kaese",   ek:2.0, vk:3.9,  pop:8},
+  {id:"joghurt",    name:"Joghurt",         emoji:"🫙", dept:"kaese",   ek:0.6, vk:1.4,  pop:8},
+  {id:"eier",       name:"Eier",            emoji:"🥚", dept:"kaese",   ek:2.4, vk:4.9,  pop:7},
+  {id:"rahm",       name:"Rahm",            emoji:"🍶", dept:"kaese",   ek:1.2, vk:2.6,  pop:6},
   {id:"raclette",   name:"Raclette",        emoji:"🫠", dept:"kaese",   ek:3.5, vk:6.9,  pop:6, season:"Winter"},
+  {id:"vacherin",   name:"Vacherin",        emoji:"🧀", dept:"kaese",   ek:4.5, vk:8.9,  pop:5, season:"Winter"},
+  /* ---- Fleisch & Fisch (10) ---- */
   {id:"poulet",     name:"Poulet",          emoji:"🍗", dept:"fleisch", ek:4.0, vk:7.9,  pop:7},
   {id:"hack",       name:"Hackfleisch",     emoji:"🥩", dept:"fleisch", ek:3.5, vk:6.9,  pop:6},
+  {id:"entrecote",  name:"Entrecôte",       emoji:"🥩", dept:"fleisch", ek:8.0, vk:15.9, pop:4},
+  {id:"speck",      name:"Speck",           emoji:"🥓", dept:"fleisch", ek:2.8, vk:5.5,  pop:6},
+  {id:"salami",     name:"Salami",          emoji:"🍖", dept:"fleisch", ek:3.0, vk:5.9,  pop:6},
+  {id:"cervelat",   name:"Cervelat",        emoji:"🌭", dept:"fleisch", ek:1.5, vk:3.2,  pop:7},
+  {id:"lachs",      name:"Lachs",           emoji:"🐟", dept:"fleisch", ek:6.0, vk:11.9, pop:5},
+  {id:"crevetten",  name:"Crevetten",       emoji:"🦐", dept:"fleisch", ek:5.0, vk:9.9,  pop:4},
   {id:"grillwurst", name:"Grillwurst",      emoji:"🌭", dept:"fleisch", ek:2.5, vk:5.5,  pop:7, season:"Sommer"},
+  {id:"fondchin",   name:"Fondue Chinoise", emoji:"🍲", dept:"fleisch", ek:9.0, vk:17.9, pop:5, season:"Winter"},
+  /* ---- NonFood (13) ---- */
   {id:"wcpapier",   name:"WC-Papier",       emoji:"🧻", dept:"nonfood", ek:2.0, vk:4.5,  pop:7},
   {id:"putzmittel", name:"Putzmittel",      emoji:"🧴", dept:"nonfood", ek:2.5, vk:4.9,  pop:5},
   {id:"pfanne",     name:"Bratpfanne",      emoji:"🍳", dept:"nonfood", ek:9.0, vk:19.9, pop:3},
+  {id:"zahnpasta",  name:"Zahnpasta",       emoji:"🪥", dept:"nonfood", ek:1.5, vk:3.2,  pop:6},
+  {id:"seife",      name:"Seife",           emoji:"🧼", dept:"nonfood", ek:1.2, vk:2.6,  pop:6},
+  {id:"waschmittel",name:"Waschmittel",     emoji:"🫧", dept:"nonfood", ek:4.0, vk:7.9,  pop:5},
+  {id:"spielzeug",  name:"Spielzeug",       emoji:"🧸", dept:"nonfood", ek:5.0, vk:10.9, pop:4},
+  {id:"schreibzeug",name:"Schreibzeug",     emoji:"✏️", dept:"nonfood", ek:1.8, vk:3.9,  pop:4},
+  {id:"batterien",  name:"Batterien",       emoji:"🔋", dept:"nonfood", ek:3.0, vk:6.5,  pop:5},
+  {id:"kerzen",     name:"Kerzen",          emoji:"🕯️", dept:"nonfood", ek:2.0, vk:4.5,  pop:4, season:"Winter"},
+  {id:"blumen",     name:"Blumenstrauss",   emoji:"💐", dept:"nonfood", ek:4.0, vk:8.9,  pop:5, season:"Frühling"},
+  {id:"sonnenbrille",name:"Sonnenbrille",   emoji:"🕶️", dept:"nonfood", ek:3.5, vk:7.9,  pop:5, season:"Sommer"},
   {id:"grillkohle", name:"Grillkohle",      emoji:"🔥", dept:"nonfood", ek:3.0, vk:6.9,  pop:4, season:"Sommer"},
 ];
 const P = {}; PRODUCTS.forEach(p=>P[p.id]=p);
@@ -231,8 +277,10 @@ function defaultState(){
     staff:{auffueller:0, kassierer:0, putz:0, sicherheit:0},
     staffRoom:100,
     billboard:false, busstop:false, reno:false,
+    invoices:[], invSeq:1, revHist:[],
+    priceAdj:{}, promoId:null, promoDay:0,
     stats:{},
-    dayLog:{rev:0, theft:0, thefts:0, buys:0, sold:0, angry:0},
+    dayLog:{rev:0, theft:0, thefts:0, buys:0, sold:0, angry:0, inv:0},
     lifetime:{rev:0, days:0},
     lastSave:Date.now(),
     tutorialDone:false, moveOffered:false,
@@ -277,9 +325,13 @@ const $ = id => document.getElementById(id);
 const fmt = n => "CHF " + (Math.round(n*20)/20).toFixed(2).replace(/\.00$/,".–");
 const fmtS = n => "CHF " + Math.round(n).toLocaleString("de-CH");
 function season(){ return SEASONS[Math.floor((S.day-1)/5)%4]; }
+function vkOf(id){ return P[id].vk + ((S.priceAdj&&S.priceAdj[id])||0); }
+function isPromo(id){ return S.promoId===id && S.promoDay===S.day; }
 function popOf(p){
-  if(!p.season) return p.pop;
-  return p.season===season() ? p.pop*3 : p.pop*0.25;
+  let v = !p.season ? p.pop : (p.season===season() ? p.pop*3 : p.pop*0.25);
+  if(isPromo(p.id)) v*=2;                        // Aktion zieht Kundschaft an
+  v /= 1 + ((S.priceAdj&&S.priceAdj[p.id])||0)*0.06;  // teurer = minim weniger beliebt
+  return v;
 }
 function theftChance(){ return Math.max(0.02, 0.20 - staffOn("sicherheit")*0.08); }
 function cleanPct(){ return Math.max(0, Math.min(100, 100 - dirt.length*6 - odirt.length*4)); }
@@ -334,6 +386,22 @@ function clockStr(){
   const h=dayHour();
   const hh=Math.floor(h), mm=Math.floor((h-hh)*60);
   return String(hh).padStart(2,"0")+":"+String(mm).padStart(2,"0");
+}
+const MONTH_DAYS=10;   // 1 Monat = 10 Spieltage
+function createInvoice(desc, amount){
+  S.invoices.push({id:S.invSeq++, desc, amount:Math.round(amount*20)/20, due:S.day+MONTH_DAYS, rate:false});
+  toast("📄 Rechnung erhalten – siehe «Finanzen»");
+  save();
+}
+function invoiceTotal(){ let t=0; S.invoices.forEach(v=>t+=v.amount); return t; }
+function worstOverdue(){
+  let w=null;
+  S.invoices.forEach(v=>{ if(S.day>v.due && (!w || v.due<w.due)) w=v; });
+  return w;
+}
+function avgRevenue(){
+  if(!S.revHist.length) return null;
+  return S.revHist.reduce((a,b)=>a+b,0)/S.revHist.length;
 }
 function completion(){
   const L=LV();
@@ -573,7 +641,7 @@ function nextGoal(c){
   }
   if(c.browser){ // nur umgeschaut
     c.angry=true; S.dayLog.angry++;
-    effects.push({x:c.x,y:c.y-26,txt:"nüt gfunde 💨",t:1.4,col:"#d33a2f"});
+    effects.push({x:c.x,y:c.y-26,txt:"nichts gefunden 💨",t:1.4,col:"#d33a2f"});
     leaveShop(c); return;
   }
   if(!c.carry.length){ leaveShop(c); return; }
@@ -622,7 +690,7 @@ function removeFromQueue(c){
 }
 function checkout(c,isScan){
   let sum=0;
-  c.carry.forEach(it=>{ sum+=P[it.prod].vk*it.qty; });
+  c.carry.forEach(it=>{ sum+=vkOf(it.prod)*it.qty; });
   if(isScan && Math.random()<theftChance()){
     c.thief=true; c.speed*=1.8;
     S.dayLog.theft+=sum; S.dayLog.thefts++;
@@ -664,7 +732,8 @@ function updateCustomers(dt){
         if(c.timer<=0){
           const d=S.shelves[c.targetSlot];
           if(d && d.prod===c.targetProd && d.units>0){
-            const qty=Math.min(d.units, 1+Math.floor(Math.random()*2));
+            let qty=Math.min(d.units, 1+Math.floor(Math.random()*2));
+            if(isPromo(c.targetProd)) qty=Math.min(d.units, qty*2);
             d.units-=qty;
             c.carry.push({prod:c.targetProd, qty, slot:c.targetSlot});
           }
@@ -690,7 +759,7 @@ function updateCustomers(dt){
         if(!c.path.length){ customers.splice(i,1); break; }
         if(!c.noted && Math.abs(c.x-LY.door.x)<36){
           c.noted=true;
-          effects.push({x:c.x,y:c.y-26,txt:"🤢 dräckig do!",t:1.5,col:"#d33a2f"});
+          effects.push({x:c.x,y:c.y-26,txt:"🤢 schmutzig hier!",t:1.5,col:"#d33a2f"});
         }
         break;
       case "leave": if(!c.path.length) customers.splice(i,1); break;
@@ -717,11 +786,11 @@ function tick(dt){
   // Mittags-Warnung & Rush
   if(!R.lunch && h>=11 && h<12){
     R.lunch=true;
-    toast("🍽️ Bald isch Mittag – Regale uffülle!", true);
+    toast("🍽️ Bald ist Mittag – Regale auffüllen!", true);
   }
   if(!R.rush && h>=11.9 && h<13.5){
     R.rush=true;
-    toast("🔥 Mittagsrush – jetzt lauft's!");
+    toast("🔥 Mittagsrush – jetzt läuft's!");
   }
   // Kundenspawn (Kurve über den Tag)
   R.spawn-=dt;
@@ -853,7 +922,8 @@ function endDay(){
   const ads=S.billboard?20:0;
   S.money-=wages+ads;
   const L=S.dayLog;
-  const profit=L.rev-wages-ads-L.buys;
+  const profit=L.rev-wages-ads-L.buys-L.inv;
+  S.revHist.push(L.rev); if(S.revHist.length>7) S.revHist.shift();
   let best=null, flop=null;
   S.assortment.forEach(id=>{
     const st=S.stats[id];
@@ -869,6 +939,8 @@ function endDay(){
     <div class="stat"><span>Wareneinkauf</span><b class="minus">−${fmtS(L.buys)}</b></div>
     <div class="stat"><span>Löhne (${hrs}h${hoursFactor()>1.01?" inkl. Zuschlag":""})</span><b class="minus">−${fmtS(wages)}</b></div>
     ${ads?`<div class="stat"><span>Werbetafel</span><b class="minus">−${fmtS(ads)}</b></div>`:""}
+    ${L.inv?`<div class="stat"><span>Rechnungen bezahlt</span><b class="minus">−${fmtS(L.inv)}</b></div>`:""}
+    ${S.invoices.length?`<div class="stat"><span>📄 Offene Rechnungen</span><b class="${worstOverdue()?'minus':''}">${fmtS(invoiceTotal())}${worstOverdue()?" · MAHNUNG!":""}</b></div>`:""}
     <div class="stat total"><span>Tagesgewinn</span><b class="${profit>=0?'plus':'minus'}">${profit>=0?"+":"−"}${fmtS(Math.abs(profit))}</b></div>
     ${best?`<div class="stat"><span>🏆 Bestseller</span><b>${P[best].emoji} ${P[best].name} (${S.stats[best].today}×)</b></div>`:""}
     ${flop?`<div class="stat"><span>🐌 Ladenhüter</span><b>${P[flop].emoji} ${P[flop].name} (${S.stats[flop].today}×)</b></div>`:""}
@@ -876,16 +948,45 @@ function endDay(){
   `);
   S.assortment.forEach(id=>{ S.stats[id].yesterday=S.stats[id].today; S.stats[id].today=0; });
   S.day++; S.t=0; S.lifetime.days++;
-  S.dayLog={rev:0,theft:0,thefts:0,buys:0,sold:0,angry:0};
+  S.dayLog={rev:0,theft:0,thefts:0,buys:0,sold:0,angry:0,inv:0};
   dirt=dirt.slice(0,Math.floor(dirt.length/2));
   odirt=odirt.slice(0,Math.floor(odirt.length/2));
   save();
 }
 function startNextDay(){
+  const dead=S.invoices.find(v=>S.day>v.due+MONTH_DAYS);
+  if(dead){ gameOver(dead); return; }
   closeDialog(); paused=false;
   R.spawn=1.5; R.lunch=false; R.rush=false;
-  if(S.money<0) toast("⚠️ Du bist im Minus – verkauf mehr!");
+  const od=worstOverdue();
+  if(od) toast(`⚠️ MAHNUNG! Rechnung zahlen – Laden zu in ${od.due+MONTH_DAYS-S.day} Tagen!`, true);
+  else if(S.money<0) toast("⚠️ Du bist im Minus – verkauf mehr!");
 }
+function gameOver(inv){
+  paused=true;
+  showDialog(`
+    <h2>🔒 Laden geschlossen!</h2>
+    <div class="sub">Die Rechnung «${inv.desc}» (${fmtS(inv.amount)}) blieb einen Monat lang unbezahlt.</div>
+    <p style="font-size:13px;color:var(--ink-soft)">Das Betreibungsamt hat deinen ${S.shopName||"Laden"} dichtgemacht. 😢
+    Aber jeder Tycoon fällt mal hin – auf zum Neustart!</p>
+    <button class="btn danger" onclick="restartGame()">Von vorne anfangen 🔄</button>
+  `);
+}
+window.gameOver=gameOver;
+window.restartGame=function(){
+  const nm=S.shopName;
+  S=defaultState();
+  S.shopName=nm; S.tutorialDone=true;
+  ensureStats();
+  customers=[]; dirt=[]; odirt=[]; effects=[];
+  buildLayout(); resetQueues(); BUS.active=false;
+  R={spawn:2, dirtT:10, odirtT:14, bus:40, autoSave:8,
+     staffKasse:0, staffFill:0, staffPutz:0, lunch:false, rush:false};
+  dayEnding=false;
+  camCenterDoor(); save(); closeDialog(); closePanel();
+  paused=false;
+  toast("🌱 Neuanfang – zeig's allen!", true);
+};
 
 /* ================= LEVEL-AUFSTIEG ================= */
 function offerMove(){
@@ -921,7 +1022,7 @@ function moveLevel(){
   });
   camCenterDoor(); save();
   showDialog(`
-    <h2>🚚 Willkomme im ${LV().name}!</h2>
+    <h2>🚚 Willkommen im ${LV().name}!</h2>
     <div class="sub">Level ${S.level+1} von 5 · alles ist grösser – bau ihn wieder auf 100% aus!</div>
     <button class="btn" onclick="closeDialog();paused=false;">Laden eröffnen ▶</button>
   `);
@@ -944,7 +1045,7 @@ function offlineSim(){
   let sold=Math.min(avail, Math.floor(elapsed/5*0.3*speed*1.8));
   if(sold<=0) return;
   let vkSum=0,n=0;
-  activeSlots().forEach(s=>{ const d=S.shelves[s.id]; if(d&&d.prod){ vkSum+=P[d.prod].vk; n++; } });
+  activeSlots().forEach(s=>{ const d=S.shelves[s.id]; if(d&&d.prod){ vkSum+=vkOf(d.prod); n++; } });
   const avgVK=n? vkSum/n : 2;
   let toSell=sold;
   activeSlots().forEach(s=>{
@@ -1194,7 +1295,8 @@ function render(){
     ctx.fillStyle="#ff7a00"; ctx.font="800 10px -apple-system,sans-serif";
     ctx.fillText((S.shopName||LV().name).toUpperCase().slice(0,14), bb.x, bb.y-14);
     ctx.fillStyle="#23303a"; ctx.font="700 8.5px -apple-system,sans-serif";
-    ctx.fillText("Hüt Aktion! "+SEASON_EMOJI[season()], bb.x, bb.y-4);
+    const promoTxt = (S.promoId && isPromo(S.promoId)) ? "AKTION: "+P[S.promoId].emoji+" "+P[S.promoId].name : "Heute frisch! "+SEASON_EMOJI[season()];
+    ctx.fillText(promoTxt.slice(0,22), bb.x, bb.y-4);
     for(let k=0;k<6;k++){
       const on=Math.floor(now*3+k)%2===0;
       ctx.fillStyle=on? "#ffd23f":"#6b7076";
@@ -1244,7 +1346,7 @@ function render(){
   // Rückwand-Deko in der Halle
   ctx.fillStyle="#23303a"; rr(LY.aisleX-64,LY.hall.y+64,128,20,6); ctx.fill();
   ctx.fillStyle="#ffd23f"; ctx.font="800 10px -apple-system,sans-serif";
-  ctx.fillText("Grüezi mitenand! 👋", LY.aisleX, LY.hall.y+78);
+  ctx.fillText("Willkommen! 👋", LY.aisleX, LY.hall.y+78);
 
   /* ---- Lager & Personalraum ---- */
   box3(LY.lager.x,LY.lager.y,LY.lager.w,LY.lager.h,8,"#d8cfb8",10);
@@ -1303,8 +1405,15 @@ function render(){
       const tagX=s.side==="R"? s.x-51 : s.x+51;
       ctx.fillStyle="#fff"; rr(tagX-14,s.y-8,28,15,3); ctx.fill();
       ctx.strokeStyle="rgba(0,0,0,.15)"; ctx.lineWidth=1; rr(tagX-14,s.y-8,28,15,3); ctx.stroke();
-      ctx.fillStyle="#d33a2f"; ctx.font="800 8.5px -apple-system,sans-serif";
-      ctx.fillText(p.vk.toFixed(2), tagX, s.y+3);
+      const promo=isPromo(d.prod);
+      ctx.fillStyle= promo? "#b40000" : "#d33a2f"; ctx.font="800 8.5px -apple-system,sans-serif";
+      ctx.fillText(vkOf(d.prod).toFixed(2), tagX, s.y+3);
+      if(promo){
+        ctx.fillStyle= Math.sin(now*7)>0? "#ffd23f":"#ff7a00";
+        rr(s.x-26,s.y-31,52,13,4); ctx.fill();
+        ctx.fillStyle="#7a2c00"; ctx.font="800 8px -apple-system,sans-serif";
+        ctx.fillText("🔥 2× AKTION", s.x, s.y-21);
+      }
       if(d.units===0 && Math.sin(now*6)>0){
         ctx.fillStyle="#d33a2f"; ctx.font="800 10px -apple-system,sans-serif";
         ctx.fillText("LEER!", s.x, s.y-23);
@@ -1537,7 +1646,67 @@ function renderPanel(){
   else if(currentPanel==="sortiment") renderSortiment();
   else if(currentPanel==="personal") renderPersonal();
   else if(currentPanel==="ausbau") renderAusbau();
+  else if(currentPanel==="finanzen") renderFinanzen();
 }
+function renderFinanzen(){
+  $("panelTitle").textContent="💰 Finanz-Übersicht";
+  $("panelSub").textContent=`Kontostand: ${fmtS(S.money)}`;
+  const avg=avgRevenue();
+  const ads=S.billboard?20:0;
+  let html="<div class='secTitle'>Täglich (ungefähr)</div>";
+  html+=`<div class="stat" style="padding:7px 4px"><span>📈 Ø Tageseinnahmen (letzte ${S.revHist.length||"–"} Tage)</span><b class="plus">${avg!==null?"+"+fmtS(avg):"noch keine Daten"}</b></div>`;
+  html+=`<div class="stat" style="padding:7px 4px"><span>🧑‍💼 Personalkosten</span><b class="minus">−${fmtS(wagesPerDay())}</b></div>`;
+  if(ads) html+=`<div class="stat" style="padding:7px 4px"><span>📣 Werbetafel</span><b class="minus">−${fmtS(ads)}</b></div>`;
+  if(avg!==null){
+    const net=avg-wagesPerDay()-ads;
+    html+=`<div class="stat total" style="padding:7px 4px"><span>Erwarteter Überschuss</span><b class="${net>=0?'plus':'minus'}">${net>=0?"+":"−"}${fmtS(Math.abs(net))}</b></div>`;
+  }
+  html+=`<div class='secTitle'>Offene Rechnungen ${S.invoices.length?`<span class="tag ${worstOverdue()?'flop':''}">${fmtS(invoiceTotal())}</span>`:""}</div>`;
+  if(!S.invoices.length){
+    html+=`<p style="font-size:13px;color:var(--ink-soft);padding:8px 4px">Keine offenen Rechnungen. 🎉 Tipp: Wenn das Geld mal nicht reicht, kannst du Ware unter «Einkauf» auf Rechnung bestellen.</p>`;
+  }
+  S.invoices.slice().sort((a,b)=>a.due-b.due).forEach(v=>{
+    const overdue=S.day>v.due;
+    const closeDay=v.due+MONTH_DAYS;
+    const daysLeft=closeDay-S.day;
+    html+=`<div class="row">
+      <div class="em">${overdue?"⚠️":"📄"}</div>
+      <div class="info"><b>${v.desc}${v.rate?' <span class="tag">Rate</span>':''}${overdue?' <span class="tag flop">MAHNUNG</span>':''}</b>
+      <small>${overdue
+        ? `Überfällig! Laden wird in <b>${daysLeft} Tag${daysLeft===1?"":"en"}</b> geschlossen!`
+        : `Fällig bis Tag ${v.due} (noch ${v.due-S.day} Tage)`}</small></div>
+      ${(!v.rate && v.amount>=30)?`<button class="btn sec" onclick="splitInvoice(${v.id})">3 Raten</button>`:""}
+      <button class="btn ${overdue?'':'green'}" onclick="payInvoice(${v.id})" ${S.money<v.amount?"disabled":""}>${fmtS(v.amount)}</button>
+    </div>`;
+  });
+  html+=`<p style="font-size:11.5px;color:var(--ink-soft);padding:8px 4px">1 Monat = ${MONTH_DAYS} Spieltage. Rechnungen sind 1 Monat nach Erhalt fällig. Wer die Mahnfrist (1 weiterer Monat) verpasst, verliert den Laden!</p>`;
+  $("panelBody").innerHTML=html;
+}
+window.payInvoice=function(id){
+  const i=S.invoices.findIndex(v=>v.id===id);
+  if(i<0) return;
+  const v=S.invoices[i];
+  if(S.money<v.amount){ toast("💸 Zu wenig Geld!"); return; }
+  S.money-=v.amount; S.dayLog.inv+=v.amount;
+  S.invoices.splice(i,1);
+  toast(`✅ Rechnung bezahlt: ${fmtS(v.amount)}`);
+  renderPanel(); save();
+};
+window.splitInvoice=function(id){
+  const i=S.invoices.findIndex(v=>v.id===id);
+  if(i<0) return;
+  const v=S.invoices[i];
+  if(v.rate) return;
+  const part=Math.round((v.amount/3)*20)/20;
+  const last=Math.round((v.amount-part*2)*20)/20;
+  S.invoices.splice(i,1);
+  for(let k=0;k<3;k++){
+    S.invoices.push({id:S.invSeq++, desc:`${v.desc} (Rate ${k+1}/3)`,
+      amount:k<2?part:last, due:v.due+k*MONTH_DAYS, rate:true});
+  }
+  toast("📄 In 3 Monatsraten aufgeteilt");
+  renderPanel(); save();
+};
 
 /* ---- Einkauf ---- */
 function renderEinkauf(){
@@ -1550,7 +1719,7 @@ function renderEinkauf(){
     html+=`<div class="row">
       <div class="em">${p.emoji}</div>
       <div class="info"><b>${p.name}${inSeason?'<span class="tag season">Saison!</span>':''}</b>
-      <small>Lager: ${S.lager[id]||0} Stk. · EK ${fmt(p.ek)} → VK ${fmt(p.vk)}</small></div>
+      <small>Lager: ${S.lager[id]||0} Stk. · EK ${fmt(p.ek)} → VK ${fmt(vkOf(id))}</small></div>
       <button class="btn sec" onclick="buyStock('${id}',10)">+10<br><small>${fmtS(p.ek*10)}</small></button>
       <button class="btn" onclick="buyStock('${id}',25)">+25<br><small>${fmtS(p.ek*25)}</small></button>
     </div>`;
@@ -1559,11 +1728,29 @@ function renderEinkauf(){
 }
 window.buyStock=function(id,n){
   const c=P[id].ek*n;
-  if(S.money<c){ toast("💸 Zu wenig Geld!"); return; }
+  if(S.money<c){
+    showDialog(`
+      <h2>📄 Auf Rechnung bestellen?</h2>
+      <div class="sub">Zu wenig Geld in der Kasse – aber der Lieferant liefert auch auf Rechnung.</div>
+      <div class="stat"><span>${P[id].emoji} ${P[id].name}</span><b>${n} Stück</b></div>
+      <div class="stat"><span>Rechnungsbetrag</span><b class="minus">${fmtS(c)}</b></div>
+      <div class="stat"><span>Zahlbar bis</span><b>Tag ${S.day+MONTH_DAYS} (1 Monat)</b></div>
+      <p style="font-size:12px;color:var(--ink-soft);margin-top:8px">⚠️ Unbezahlte Rechnungen: Nach der Frist läuft ein Monat Mahnfrist – dann wird der Laden geschlossen! Zahlen (auch in Raten) unter «Finanzen».</p>
+      <button class="btn" onclick="buyStockInvoice('${id}',${n})">Auf Rechnung bestellen 📄</button>
+      <button class="btn sec" onclick="closeDialog()">Abbrechen</button>
+    `);
+    return;
+  }
   S.money-=c; S.dayLog.buys+=c;
   S.lager[id]=(S.lager[id]||0)+n;
   toast(`📦 ${n}× ${P[id].name} ins Lager geliefert`);
   renderPanel(); save();
+};
+window.buyStockInvoice=function(id,n){
+  const c=P[id].ek*n;
+  S.lager[id]=(S.lager[id]||0)+n;
+  createInvoice(`${n}× ${P[id].name}`, c);
+  closeDialog(); renderPanel();
 };
 
 /* ---- Sortiment ---- */
@@ -1581,19 +1768,35 @@ function renderSortiment(){
       <small>Gestern: ${st.yesterday}× · Total: ${st.total}× verkauft</small></div>
       <button class="btn danger" onclick="dropProduct('${id}')">Rauswerfen</button>
     </div>`;
-  });
-  html+="<div class='secTitle'>Verfügbare Produkte</div>";
-  PRODUCTS.forEach(p=>{
-    if(S.assortment.includes(p.id)) return;
-    const unlocked=S.depts.includes(p.dept);
-    html+=`<div class="row" style="${unlocked?"":"opacity:.45"}">
-      <div class="em">${p.emoji}</div>
-      <div class="info"><b>${p.name}${p.season?`<span class="tag ${p.season===season()?'season':''}">${SEASON_EMOJI[p.season]} ${p.season}</span>`:""}</b>
-      <small>${DEPTS[p.dept].emoji} ${DEPTS[p.dept].name} · EK ${fmt(p.ek)} → VK ${fmt(p.vk)}</small></div>
-      ${unlocked
-        ? `<button class="btn green" onclick="addProduct('${p.id}')">Aufnehmen</button>`
-        : `<span class="tag">🔒 ${DEPTS[p.dept].name}</span>`}
+    const adj=(S.priceAdj[id]||0);
+    html+=`<div class="row" style="padding-top:2px">
+      <div class="em" style="font-size:15px">💲</div>
+      <div class="info" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <b style="font-size:13px">${fmt(vkOf(id))}</b>
+        ${adj>0?`<span class="tag season">+${adj.toFixed(2)}</span>`:""}
+        <button class="btn sec" style="padding:6px 11px" onclick="adjPrice('${id}',-1)" ${adj<=0?"disabled":""}>−</button>
+        <button class="btn sec" style="padding:6px 11px" onclick="adjPrice('${id}',1)" ${adj>=5?"disabled":""}>＋ ${fmtS(cost(20))}</button>
+        ${isPromo(id)
+          ? '<span class="tag hit">🔥 AKTION heute</span>'
+          : `<button class="btn" style="padding:6px 10px" onclick="setPromo('${id}')">🔥 Aktion ${fmtS(cost(30))}</button>`}
+      </div>
     </div>`;
+  });
+  Object.keys(DEPTS).forEach(dk=>{
+    const avail=PRODUCTS.filter(p=>p.dept===dk && !S.assortment.includes(p.id));
+    if(!avail.length) return;
+    const unlocked=S.depts.includes(dk);
+    html+=`<div class='secTitle'>${DEPTS[dk].emoji} ${DEPTS[dk].name} ${unlocked?"":"🔒 (Abteilung nicht gebaut)"}</div>`;
+    avail.forEach(p=>{
+      html+=`<div class="row" style="${unlocked?"":"opacity:.45"}">
+        <div class="em">${p.emoji}</div>
+        <div class="info"><b>${p.name}${p.season?`<span class="tag ${p.season===season()?'season':''}">${SEASON_EMOJI[p.season]} ${p.season}</span>`:""}</b>
+        <small>EK ${fmt(p.ek)} → VK ${fmt(p.vk)}</small></div>
+        ${unlocked
+          ? `<button class="btn green" onclick="addProduct('${p.id}')">Aufnehmen</button>`
+          : `<span class="tag">🔒</span>`}
+      </div>`;
+    });
   });
   $("panelBody").innerHTML=html;
 }
@@ -1603,9 +1806,32 @@ window.addProduct=function(id){
   toast(`✅ ${P[id].name} ist neu im Sortiment`);
   renderPanel(); save();
 };
+window.adjPrice=function(id,dir){
+  const cur=S.priceAdj[id]||0;
+  if(dir>0){
+    if(cur>=5){ toast("Maximal +5.– Aufschlag pro Produkt."); return; }
+    if(!pay(cost(20))) return;
+    S.priceAdj[id]=Math.round((cur+0.5)*2)/2;
+    toast(`💲 ${P[id].name}: neuer Preis ${fmt(vkOf(id))}`);
+  }else{
+    if(cur<=0) return;
+    S.priceAdj[id]=Math.round((cur-0.5)*2)/2;
+    if(S.priceAdj[id]===0) delete S.priceAdj[id];
+    toast(`💲 ${P[id].name}: Preis gesenkt auf ${fmt(vkOf(id))}`);
+  }
+  renderPanel(); save();
+};
+window.setPromo=function(id){
+  if(!pay(cost(30))) return;
+  S.promoId=id; S.promoDay=S.day;
+  toast(`🔥 AKTION heute: ${P[id].emoji} ${P[id].name} – Kunden kaufen doppelt!`, true);
+  renderPanel(); save();
+};
 window.dropProduct=function(id){
   S.assortment=S.assortment.filter(x=>x!==id);
   delete S.lager[id];
+  delete S.priceAdj[id];
+  if(S.promoId===id) S.promoId=null;
   Object.keys(S.shelves).forEach(k=>{
     if(S.shelves[k].prod===id){ S.shelves[k].prod=null; S.shelves[k].units=0; }
   });
@@ -1685,7 +1911,7 @@ function renderAusbau(){
       <button class="btn green" onclick="offerMove()">${fmtS(L.moveCost)}</button></div>`;
   }else if(pct>=100){
     html+=`<div class="row"><div class="em">🏆</div>
-      <div class="info"><b>MEGA-MÄRT komplett!</b>
+      <div class="info"><b>XL-MEGA-MARKT komplett!</b>
       <small>Du hast das grösste Level erreicht. Chapeau, Tycoon!</small></div></div>`;
   }
   const span=S.closeH-S.openH;
@@ -1827,7 +2053,7 @@ function askName(renaming){
   showDialog(`
     <h2>🏪 ${renaming?"Neuer Ladenname":"Wie soll dein Laden heissen?"}</h2>
     <div class="sub">Der Name steht gross über dem Eingang – und auf deiner Werbetafel.</div>
-    <input id="nameInput" maxlength="18" placeholder="z.B. Joels Märt"
+    <input id="nameInput" maxlength="18" placeholder="z.B. Joels Markt"
       value="${(S.shopName||"").replace(/["<>]/g,"")}"
       style="width:100%;padding:12px;border:2px solid #dde3e6;border-radius:12px;font:inherit;font-size:15px">
     <button class="btn" onclick="saveName(${renaming?1:0})">Übernehmen ✓</button>
@@ -1838,15 +2064,33 @@ window.askName=askName;
 window.saveName=function(renaming){
   const el=$("nameInput");
   const v=el? el.value.trim().slice(0,18) : "";
-  S.shopName = v || "Min Märt";
+  S.shopName = v || "Mein Markt";
   save(); closeDialog();
-  if(!renaming && !S.tutorialDone){ tutorial(); }
+  if(!renaming && !S.tutorialDone){ giftDialog(); }
   else{ paused=false; toast("🏪 "+S.shopName); if(currentPanel) renderPanel(); }
 };
+
+/* ================= START-GESCHENK ================= */
+function giftDialog(){
+  paused=true;
+  showDialog(`
+    <div style="text-align:center;font-size:52px;line-height:1.1">🧑‍💼🎁</div>
+    <h2 style="text-align:center;margin-top:6px">Willkommen, Chef!</h2>
+    <div class="sub" style="text-align:center">Ich bin Max von <b>Nextform Games</b>.</div>
+    <p style="font-size:13.5px;text-align:center;margin-bottom:10px">Wir schenken dir Produkte für deinen perfekten Supermarkt-Start! 🎉</p>
+    <div class="stat"><span>🍞 Brot</span><b>35 Stück (15 schon im Regal)</b></div>
+    <div class="stat"><span>🥛 Milch</span><b>35 Stück (15 schon im Regal)</b></div>
+    <div class="stat"><span>🍝 Pasta</span><b>25 Stück (10 schon im Regal)</b></div>
+    <div class="stat"><span>🍫 Schokolade</span><b>10 Stück (im Lager)</b></div>
+    <div class="stat"><span>💰 Startkapital</span><b>${fmtS(80)}</b></div>
+    <button class="btn" onclick="closeDialog();tutorial();">Danke, Max! 🙌</button>
+  `);
+}
 
 /* ================= HUD & LOOP ================= */
 function updateHUD(){
   $("uiMoney").textContent=fmtS(S.money);
+  $("uiMoney").style.color = S.money<0 ? "#ff8a7a" : "#ffd28f";
   $("uiDay").textContent=(S.shopName?S.shopName+" · ":"")+`Tag ${S.day}`;
   $("uiDay").title=season();
   $("uiClock").textContent=clockStr()+" · "+SEASON_EMOJI[season()]+" · Lv."+(S.level+1);
@@ -1865,8 +2109,8 @@ function loop(now){
 /* ================= START ================= */
 function tutorial(){
   showDialog(`
-    <h2>🛒 Willkommen im Märt-Tycoon!</h2>
-    <div class="sub">Vom Dorflädeli zum MEGA-MÄRT – 5 Level warten auf dich.</div>
+    <h2>🛒 Willkommen im Markt-Tycoon!</h2>
+    <div class="sub">by Nextform Games · Vom Dorfladen zum 24h-XL-Supermarkt – 5 Level warten auf dich.</div>
     <div class="stat"><span>👆 Wischen</span><b>Umherschauen im Laden</b></div>
     <div class="stat"><span>🗄️ Regal antippen</span><b>Auffüllen</b></div>
     <div class="stat"><span>🧾 Kasse antippen</span><b>Kassieren</b></div>
@@ -1889,7 +2133,7 @@ function boot(){
   camCenterDoor();
   requestAnimationFrame(loop);
   if(!S.shopName){ askName(0); }
-  else if(!hadSave || !S.tutorialDone){ tutorial(); }
+  else if(!hadSave || !S.tutorialDone){ giftDialog(); }
   else{ offlineSim(); }
   if(!canStore) toast("⚠️ Speichern hier nicht möglich – auf GitHub Pages klappt's!");
   setTimeout(()=>{ if(!PTR.hinted) $("panHint").style.opacity=0; }, 8000);
