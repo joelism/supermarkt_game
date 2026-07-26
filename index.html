@@ -2512,8 +2512,12 @@ function render(){
       const bx=Math.floor((PJ(0,LY.worldH).x-6)/48)*48;
       const by=Math.floor((PJ(0,0).y-6)/48)*48;
       const bw=PJ(LY.worldW,0).x+6-bx, bh2=PJ(LY.worldW,LY.worldH).y+6-by;
+      // Wichtig: Sprite in Basis-Kamera-Koordinaten einfügen (wir stecken hier in der Welt-Transformation)
+      ctx.save();
+      ctx.setTransform(sc*_dpr,0,0,sc*_dpr, -cam.x*sc*_dpr, -cam.y*sc*_dpr);
       cachedPJ("ground|"+S.level+"|"+S.parking+"|"+(S.reno?1:0)+"|"+S.hallShelves+"|"+(S.office?1:0)+"|"+S.staffRoomLvl,
         bx,by,bw,bh2, ()=>{ isoWorld(groundDetail); });
+      ctx.restore();
     }
     // Dreck innen (dynamisch, bleibt live)
     dirt.forEach(dd=>{
