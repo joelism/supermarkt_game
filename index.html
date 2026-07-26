@@ -34,6 +34,15 @@ body{
 #topbar .clock{font-size:11.5px;color:#b9c6cf}
 #topbar .clean{font-size:12px;text-align:right;line-height:1.2}
 .cleanbar{width:64px;height:6px;background:#3b4b58;border-radius:3px;overflow:hidden;margin-top:3px;margin-left:auto}
+#moneyFx{position:absolute;top:52px;left:10px;z-index:30;pointer-events:none;display:flex;flex-direction:column;gap:3px;align-items:flex-start}
+.mfx{background:rgba(22,30,38,.88);padding:2.5px 9px;border-radius:9px;font-size:11px;font-weight:800;
+  animation:mfxUp 1.6s ease forwards;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.mfx.plus{color:#7dffb0}
+.mfx.minus{color:#ff9a8a}
+@keyframes mfxUp{0%{transform:translateY(6px);opacity:0}12%{transform:none;opacity:1}75%{opacity:1}100%{transform:translateY(-8px);opacity:0}}
+.tl{position:relative;height:9px;background:#e9edf0;border-radius:4px;margin-top:5px;overflow:hidden}
+.tlSeg{position:absolute;top:0;height:9px;border-radius:3px;opacity:.85}
+.tlNow{position:absolute;top:-1px;height:11px;width:2px;background:var(--red)}
 #reqBox{position:absolute;left:10px;right:10px;bottom:66px;z-index:18;display:flex;flex-direction:column;gap:6px;pointer-events:none}
 .reqCard{pointer-events:auto;background:rgba(28,36,44,.94);color:#fff;border-radius:12px;padding:8px 10px;
   display:flex;align-items:center;gap:8px;font-size:12.5px;box-shadow:0 4px 14px rgba(0,0,0,.3);
@@ -132,6 +141,7 @@ canvas{display:block;touch-action:none;position:absolute;left:50%;top:50%;transf
 
 <div id="topbar">
   <div class="money" id="uiMoney">CHF 0</div>
+  <div id="moneyFx"></div>
   <div class="mid">
     <div class="day" id="uiDay">Tag 1</div>
     <div class="clock" id="uiClock">08:00</div>
@@ -320,7 +330,7 @@ function defaultState(){
     parking:2,
     staffRoomLvl:1, shelfTier:1, kasseTier:1, scanTier:1,
     camTier:0, gateTier:0, office:false, parkMeterTier:0,
-    mood:85, lunchPlan:{}, breaks:{},
+    mood:85, moodBy:{}, lunchPlan:{}, breaks:{},
     stats:{},
     dayLog:{rev:0, theft:0, thefts:0, buys:0, sold:0, angry:0, inv:0, caught:0, fines:0, pfees:0},
     lifetime:{rev:0, days:0},
@@ -395,8 +405,9 @@ function load(){
       });
     }
     if(typeof S.mood!=="number") S.mood=85;
-    ["lunchPlan","breaks"].forEach(k=>{ if(typeof S[k]!=="object"||!S[k]) S[k]={}; });
+    ["lunchPlan","breaks","moodBy"].forEach(k=>{ if(typeof S[k]!=="object"||!S[k]) S[k]={}; });
   Object.keys(S.lunchPlan).forEach(k=>{ if(!Array.isArray(S.lunchPlan[k])) delete S.lunchPlan[k]; });
+  Object.keys(S.breaks).forEach(k=>{ if(k.indexOf("_")<0) delete S.breaks[k]; });   // altes Rollen-Format
     ensureStats(); return true;
   }catch(e){ canStore=false; return false; }
 }
@@ -455,6 +466,24 @@ function shiftRange(k){
 }
 function shiftHours(k){ const r=shiftRange(k); return Math.max(0, r[1]-r[0]); }
 const LUNCH_SLOTS=["11","12","13"];
+const EMP_NAMES=["Lena","Marco","Aisha","Timo","Sofia","Nils","Elif","Jonas","Mara","Luca","Ida","Rafael","Noe","Selin","Fabio","Zoe"];
+function empName(k,i){
+  const off={kassierer:0,auffueller:5,putz:9,sicherheit:12}[k]||0;
+  return EMP_NAMES[(off+i*3)%EMP_NAMES.length];
+}
+function moodArr(k){
+  if(!S.moodBy) S.moodBy={};
+  let a=S.moodBy[k];
+  if(!Array.isArray(a)) a=S.moodBy[k]=[];
+  while(a.length<(S.staff[k]||0)) a.push(Math.round(S.mood||80));
+  if(a.length>(S.staff[k]||0)) a.length=S.staff[k]||0;
+  return a;
+}
+function empOnPause(k,i){
+  const b=S.breaks&&S.breaks[k+"_"+i];
+  return !!(b && b.day===S.day && dayHour()<b.until);
+}
+function empAway(k,i){ return empAtLunch(k,i) || empOnPause(k,i); }
 function lunchArr(k){
   let a=S.lunchPlan[k];
   if(!Array.isArray(a)){
@@ -476,8 +505,9 @@ function lunchAway(k){
   return n;
 }
 function onBreak(k){
-  const b=S.breaks&&S.breaks[k];
-  if(b && b.day===S.day && dayHour()<b.until) return "pause";
+  let allP=(S.staff[k]||0)>0;
+  for(let i=0;i<(S.staff[k]||0);i++) if(!empOnPause(k,i)) allP=false;
+  if(allP && (S.staff[k]||0)>0) return "pause";
   if((S.staff[k]||0)>0 && lunchAway(k)>=S.staff[k]) return "lunch";
   return null;
 }
@@ -485,9 +515,9 @@ function staffOn(k){
   if(!S.staff[k]) return 0;
   const h=dayHour(), r=shiftRange(k);
   if(h<r[0] || h>=r[1]) return 0;
-  const b=S.breaks&&S.breaks[k];
-  if(b && b.day===S.day && h<b.until) return 0;
-  return Math.max(0, S.staff[k]-lunchAway(k));
+  let n=0;
+  for(let i=0;i<S.staff[k];i++) if(!empAway(k,i)) n++;
+  return n;
 }
 function wagesPerDay(){
   let sum=0;
@@ -1203,31 +1233,50 @@ function tick(dt){
     const anyStaff=Object.values(S.staff).some(v=>v>0);
     if(anyStaff){
       const sDirtM=dirt.filter(d2=>d2.y<LY.gang.y+LY.gang.h).length;
-      S.mood=Math.max(0, S.mood - dt*(100/2400)*(S.staffRoom<30?1.8:1) - dt*sDirtM*(100/5200));
-      if(S.staffRoomLvl>=2) S.mood=Math.min(100, S.mood + dt*(100/9000)*(S.staffRoomLvl-1));
-      if(S.staffRoomLvl>=4) S.mood=Math.min(100, S.mood + dt*(100/2600));   // Ruheraum: Schlaf regeneriert
+      const drain=dt*(100/2400)*(S.staffRoom<30?1.8:1) + dt*sDirtM*(100/5200);
+      let regen=0;
+      if(S.staffRoomLvl>=2) regen+=dt*(100/9000)*(S.staffRoomLvl-1);
+      let sum=0, cnt=0, worst=null;
+      Object.keys(S.staff).forEach(k=>{
+        const a=moodArr(k);
+        for(let i=0;i<a.length;i++){
+          const pers=0.88+((i*7+k.length)%5)*0.07;              // jede:r tickt etwas anders
+          let m=a[i]-drain*pers+regen;
+          if(S.staffRoomLvl>=4 && empAway(k,i)) m+=dt*(100/900); // Schlaf/Erholung während Pause
+          a[i]=Math.max(0,Math.min(100,m));
+          sum+=a[i]; cnt++;
+          if(a[i]<15 && (!worst||a[i]<worst.m)) worst={k,i,m:a[i]};
+        }
+      });
+      S.mood=cnt? sum/cnt : 85;
       R.quitCd-=dt;
-      if(S.mood<15 && R.quitCd<=0 && Math.random()<dt*0.06){
-        const roles=Object.keys(S.staff).filter(r2=>S.staff[r2]>0);
-        const r2=roles[Math.random()*roles.length|0];
-        S.staff[r2]--;
-        toast(`😡 ${STAFF[r2].name} hat gekündigt! Stell im Personal-Tab neu ein.`, true);
-        R.quitCd=90; S.mood=Math.min(100,S.mood+18);
+      if(worst && R.quitCd<=0 && Math.random()<dt*0.06){
+        const nm=empName(worst.k,worst.i);
+        S.staff[worst.k]--;
+        moodArr(worst.k).splice(worst.i,1);
+        if(Array.isArray(S.lunchPlan[worst.k])) S.lunchPlan[worst.k].splice(worst.i,1);
+        delete S.breaks[worst.k+"_"+worst.i];
+        toast(`😡 ${nm} (${STAFF[worst.k].name}) hat gekündigt! Stell im Personal-Tab neu ein.`, true);
+        R.quitCd=90;
         if(currentPanel==="personal") renderPanel();
       }
     }
     // 30-Min-Pausen-Anfragen auslösen
     const hNow2=dayHour();
     (R.reqs||[]).forEach(rq=>{
-      if(!rq.fired && hNow2>=rq.at && S.staff[rq.role]>0 && !onBreak(rq.role)){
+      if(!rq.fired && hNow2>=rq.at && (rq.idx||0)<(S.staff[rq.role]||0) && !empAway(rq.role,rq.idx||0)){
         rq.fired=true;
-        BREQ.push({role:rq.role, t:26});
+        BREQ.push({role:rq.role, idx:rq.idx||0, t:26});
         renderReqs();
       }
     });
     for(let i=BREQ.length-1;i>=0;i--){
       BREQ[i].t-=dt;
-      if(BREQ[i].t<=0){ S.mood=Math.max(0,S.mood-4); BREQ.splice(i,1); renderReqs(); }
+      if(BREQ[i].t<=0){
+        const a=moodArr(BREQ[i].role);
+        if(a[BREQ[i].idx]!==undefined) a[BREQ[i].idx]=Math.max(0,a[BREQ[i].idx]-4);
+        BREQ.splice(i,1); renderReqs();
+      }
     }
   }
   // Personalraum
@@ -1451,12 +1500,13 @@ window.skipPlan=function(){ PLAN=null; startNextDay(); };
 const BREQ=[];
 function planBreakReqs(){
   R.reqs=[];
-  const roles=["kassierer","auffueller","putz","sicherheit"].filter(r=>S.staff[r]>0);
   const vFrom=S.openH+0.7, vTo=Math.min(10.8, S.closeH-1);
   const cluster=(Math.random()<0.25 && vTo>vFrom)? vFrom+Math.random()*(vTo-vFrom) : null;
-  roles.forEach(r=>{
-    if(vTo>vFrom) R.reqs.push({role:r, at: cluster!==null? cluster : vFrom+Math.random()*(vTo-vFrom)});
-    if(S.closeH>14.6) R.reqs.push({role:r, at: 13.2+Math.random()*(S.closeH-1-13.2)});
+  ["kassierer","auffueller","putz","sicherheit"].forEach(r=>{
+    for(let i=0;i<(S.staff[r]||0);i++){
+      if(vTo>vFrom) R.reqs.push({role:r, idx:i, at: cluster!==null? cluster : vFrom+Math.random()*(vTo-vFrom)});
+      if(S.closeH>14.6) R.reqs.push({role:r, idx:i, at: 13.2+Math.random()*(S.closeH-1-13.2)});
+    }
   });
 }
 window.showCleanInfo=function(){
@@ -1471,32 +1521,84 @@ window.showCleanInfo=function(){
     🏢 Bessere Personalraum-Stufen verkraften mehr Flecken.</p>
     <button class="btn sec" onclick="closeDialog()">Alles klar</button>`);
 };
+window.payBonus=function(k,i){
+  if(!pay(10)) return;
+  const a=moodArr(k);
+  if(a[i]===undefined) return;
+  a[i]=Math.min(100, a[i]+15);
+  effects.push({x:LY.staffR.x+LY.staffR.w/2, y:LY.staffR.y+24, txt:"💵 Bonus!", t:1.4, col:"#1f8a4d"});
+  toast(`💵 ${empName(k,i)} freut sich über den Bonus!`);
+  showMoodInfo(); save();
+};
+function empStatus(k,i){
+  const h=dayHour(), r=shiftRange(k);
+  if(h<r[0]||h>=r[1]) return ["🌙 ausser Schicht","#7a8792"];
+  if(empAtLunch(k,i)) return ["🍽️ Mittag","#e8a13a"];
+  if(empOnPause(k,i)) return [(S.staffRoomLvl>=4?"💤":"☕")+" Pause","#5f88c9"];
+  return ["🏪 im Laden","#1f8a4d"];
+}
 window.showMoodInfo=function(){
   const eff=Math.round((0.7+0.5*(S.mood||85)/100)*100);
+  const o=S.openH, c=S.closeH, span=c-o;
+  const pct=h=>Math.max(0,Math.min(100,(h-o)/span*100));
+  const nowH=dayHour();
+  let rows="";
+  ["kassierer","auffueller","putz","sicherheit"].forEach(k=>{
+    const a=moodArr(k);
+    for(let i=0;i<a.length;i++){
+      const m=Math.round(a[i]);
+      const mc=m<25?"#d33a2f":m<50?"#e8a13a":"#39c46e";
+      const [st,stc]=empStatus(k,i);
+      const lp=+(lunchArr(k)[i]||"11");
+      const b=S.breaks[k+"_"+i];
+      const brSeg=(b&&b.day===S.day)?`<i class="tlSeg" style="left:${pct(b.until-0.5)}%;width:${pct(b.until)-pct(b.until-0.5)}%;background:#5f88c9"></i>`:"";
+      rows+=`<div class="row" style="align-items:flex-start">
+        <div class="em">${STAFF[k].emoji}</div>
+        <div class="info">
+          <b>${empName(k,i)} <span class="tag" style="font-weight:600">${STAFF[k].name}</span>
+          <span class="tag" style="background:${stc}22;color:${stc};border:1px solid ${stc}55">${st}</span></b>
+          <div style="display:flex;align-items:center;gap:7px;margin-top:4px">
+            <div style="flex:1;height:6px;background:#e5e9ec;border-radius:3px;overflow:hidden">
+              <i style="display:block;height:6px;width:${m}%;background:${mc}"></i>
+            </div>
+            <small style="width:34px;text-align:right;font-weight:800;color:${mc}">${m}%</small>
+          </div>
+          <div class="tl">
+            <i class="tlSeg" style="left:${pct(lp)}%;width:${pct(lp+1)-pct(lp)}%;background:#e8a13a"></i>
+            ${brSeg}
+            <i class="tlNow" style="left:${pct(nowH)}%"></i>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--ink-soft)">
+            <span>${o}:00</span><span>Mittag ${lp}–${lp+1}</span><span>${c}:00</span>
+          </div>
+        </div>
+        <button class="btn" style="padding:7px 10px" onclick="payBonus('${k}',${i})">💵 +10</button>
+      </div>`;
+    }
+  });
+  if(!rows) rows=`<p style="font-size:13px;color:var(--ink-soft)">Noch niemand eingestellt – wirf einen Blick in den Personal-Tab!</p>`;
   showDialog(`
     <h2>😊 Team-Laune: ${Math.round(S.mood)}%</h2>
-    <div class="sub">Aktuelles Arbeitstempo deines Teams: ${eff}%</div>
-    <p style="font-size:13px"><b>Laune steigt durch:</b><br>
-    ✓ Angenommene 30-Min-Pausen (+8)<br>
-    🛋️ Personalraum-Ausbau (passive Erholung ab Stufe 2)<br>
-    💤 Ruheraum (Stufe 4): Schlafen in der Pause regeneriert stark</p>
-    <p style="font-size:13px"><b>Laune sinkt durch:</b><br>
-    ✕ Abgelehnte (−6) oder ignorierte (−4) Pausen-Anfragen<br>
-    🗑️ Abfall in der Personal-Etage – jeder Fleck zieht dauerhaft runter<br>
-    🤢 Verdreckter Personalraum (unter 30%)</p>
-    <p style="font-size:13px;color:var(--red)"><b>⚠️ Im roten Bereich (unter 15%) kündigen Mitarbeitende!</b></p>
+    <div class="sub">Arbeitstempo: ${eff}% · 💵 Bonus (CHF 10) hebt die Laune einer Person um +15</div>
+    ${rows}
+    <p style="font-size:11.5px;color:var(--ink-soft);margin:8px 0 0">
+    Laune steigt: Pausen annehmen (+8), Bonus (+15), Personalraum-Ausbau, 💤 Ruheraum.
+    Laune sinkt: abgelehnte (−6) / ignorierte (−4) Anfragen, 🗑️ Abfall in der Personal-Etage.
+    <b style="color:var(--red)">Unter 15% drohen Kündigungen!</b></p>
     <button class="btn sec" onclick="closeDialog()">Alles klar</button>`);
 };
 window.acceptBreak=function(i){
   const rq=BREQ[i]; if(!rq) return;
-  S.breaks[rq.role]={day:S.day, until:dayHour()+0.5};
-  S.mood=Math.min(100, S.mood+8);
-  toast(`☕ ${STAFF[rq.role].name} macht 30 Min Pause – das Team freut's!`);
+  S.breaks[rq.role+"_"+rq.idx]={day:S.day, until:dayHour()+0.5};
+  const a=moodArr(rq.role);
+  if(a[rq.idx]!==undefined) a[rq.idx]=Math.min(100,a[rq.idx]+8);
+  toast(`☕ ${empName(rq.role,rq.idx)} macht 30 Min Pause – danke, Chef!`);
   BREQ.splice(i,1); renderReqs(); save();
 };
 window.declineBreak=function(i){
   const rq=BREQ[i]; if(!rq) return;
-  S.mood=Math.max(0, S.mood-6);
+  const a=moodArr(rq.role);
+  if(a[rq.idx]!==undefined) a[rq.idx]=Math.max(0,a[rq.idx]-6);
   effects.push({x:LY.staffR.x+LY.staffR.w/2, y:LY.staffR.y+20, txt:"💢", t:1.4, col:"#d33a2f"});
   BREQ.splice(i,1); renderReqs(); save();
 };
@@ -1505,7 +1607,7 @@ function renderReqs(){
   if(!box) return;
   box.innerHTML=BREQ.map((rq,i)=>`
     <div class="reqCard">
-      <span>${STAFF[rq.role].emoji} <b>${STAFF[rq.role].name}</b> fragt: 30 Min Pause?</span>
+      <span>${STAFF[rq.role].emoji} <b>${empName(rq.role,rq.idx)}</b> (${STAFF[rq.role].name}) fragt: 30 Min Pause?</span>
       <button class="chip" onclick="acceptBreak(${i})">✓ Ja</button>
       <button class="chip" onclick="declineBreak(${i})">✕ Nein</button>
     </div>`).join("");
@@ -1673,8 +1775,9 @@ function offlineSim(){
   let rev=sold*avgVK, theft=0;
   if(S.staff.kassierer===0){ theft=rev*theftChance(); rev-=theft; }
   const dayFrac=elapsed/dayLen();
-  const wages=wagesPerDay()*dayFrac;
-  S.money+=rev-wages;
+  const wages=Math.min(rev, wagesPerDay()*dayFrac);   // Löhne höchstens aus dem Umsatz – offline nie Verlust
+  const net=Math.max(0, rev-wages);
+  S.money+=net;
   S.lifetime.rev+=rev;
   {
     const n=Math.min(3, Math.round(dayFrac*3));
@@ -1693,7 +1796,9 @@ function offlineSim(){
     <div class="stat"><span>Verkaufte Artikel</span><b>${sold}</b></div>
     <div class="stat"><span>Umsatz</span><b class="plus">+${fmtS(rev)}</b></div>
     ${theft>0?`<div class="stat"><span>Diebstahl</span><b class="minus">−${fmtS(theft)}</b></div>`:""}
-    <div class="stat"><span>Löhne (anteilig)</span><b class="minus">−${fmtS(wages)}</b></div>
+    <div class="stat"><span>Löhne (anteilig, max. Umsatz)</span><b class="minus">−${fmtS(wages)}</b></div>
+    <div class="stat"><span>Netto</span><b class="plus">+${fmtS(net)}</b></div>
+    <p style="font-size:11.5px;color:var(--ink-soft);margin:6px 0 0">Im Hintergrund läuft dein Laden gedrosselt und macht nie Verlust.</p>
     <button class="btn" onclick="closeDialog();paused=false;">Weiter geht's ▶</button>
   `);
   paused=true;
@@ -1746,6 +1851,10 @@ function resize(){
   computeScale(); clampCam();
 }
 window.addEventListener("resize",resize);
+document.addEventListener("visibilitychange",()=>{
+  if(document.hidden){ save(); }
+  else{ last=performance.now(); }
+});
 $("setBtn").onclick=()=>{ openSettings(); };
 window.openSettings=function(){
   paused=true;
@@ -1935,10 +2044,7 @@ function walkerCount(k){ return Object.keys(BW).filter(x=>x.startsWith(k+"_")).l
 function roleOnShift(k){
   if(!S.staff[k]) return false;
   const h=dayHour(), r=shiftRange(k);
-  if(h<r[0]||h>=r[1]) return false;
-  const b=S.breaks&&S.breaks[k];
-  if(b && b.day===S.day && h<b.until) return false;
-  return true;
+  return h>=r[0] && h<r[1];
 }
 const STAFF_LOOK={kassierer:["#2e6da4","#e8bd90","#4a3220"], auffueller:["#d08a30","#c98a5b","#1e1e1e"],
                   putz:["#5aa060","#f2c9a0","#7a4a1e"], sicherheit:["#2f3b46","#c98a5b","#1e1e1e"]};
@@ -1989,11 +2095,10 @@ function drawBreakWalkers(now,dtv){
   let seat=0;
   ["kassierer","auffueller","putz","sicherheit"].forEach(k=>{
     const n=S.staff[k]||0;
-    const roleBreak=onBreak(k);
     for(let i=0;i<n;i++){
       const key=k+"_"+i;
-      const away=(roleBreak==="pause") || empAtLunch(k,i);
-      const kind=(roleBreak==="pause" && S.staffRoomLvl>=4)? "ruhe" : "staffR";
+      const away=empAway(k,i);
+      const kind=(empOnPause(k,i) && S.staffRoomLvl>=4)? "ruhe" : "staffR";
       let w=BW[key];
       if(away && !w){
         const wp=workPos(k,i);
@@ -3831,6 +3936,20 @@ function giftDialog(){
 function updateHUD(){
   $("uiMoney").textContent=fmtS(S.money);
   $("uiMoney").style.color = S.money<0 ? "#ff8a7a" : "#ffd28f";
+  if(window.__lastMoney===undefined) window.__lastMoney=S.money;
+  const mDelta=S.money-window.__lastMoney;
+  if(Math.abs(mDelta)>=0.005){
+    window.__lastMoney=S.money;
+    const box=$("moneyFx");
+    if(box){
+      const el=document.createElement("div");
+      el.className="mfx "+(mDelta>0?"plus":"minus");
+      el.textContent=(mDelta>0?"+":"−")+fmt(Math.abs(mDelta));
+      box.appendChild(el);
+      while(box.children.length>4) box.removeChild(box.firstChild);
+      setTimeout(()=>{ if(el.parentNode) el.parentNode.removeChild(el); }, 1650);
+    }
+  }
   $("uiDay").textContent=(S.shopName?S.shopName+" · ":"")+`Tag ${S.day}`;
   $("uiDay").title=season();
   $("uiClock").textContent=clockStr()+" · "+SEASON_EMOJI[season()]+" · Lv."+(S.level+1);
