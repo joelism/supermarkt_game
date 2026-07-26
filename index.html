@@ -37,12 +37,14 @@ body{
 .cleanbar>i{display:block;height:100%;background:var(--green);border-radius:3px;transition:width .4s}
 #stage{flex:1;position:relative;overflow:hidden;background:#7fae70}
 canvas{display:block;touch-action:none;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
-#zoomBtn{
-  position:absolute;right:10px;bottom:10px;z-index:5;
+#zoomBtn, #setBtn{
+  position:absolute;right:10px;z-index:5;
   width:44px;height:44px;border-radius:50%;border:0;
   background:rgba(35,48,58,.85);color:#fff;font-size:19px;
   box-shadow:var(--shadow);cursor:pointer;
 }
+#zoomBtn{bottom:10px}
+#setBtn{top:10px}
 #panHint{
   position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:5;
   background:rgba(35,48,58,.8);color:#fff;font-size:12px;font-weight:700;
@@ -101,6 +103,12 @@ canvas{display:block;touch-action:none;position:absolute;left:50%;top:50%;transf
 .stat b.plus{color:var(--green)} .stat b.minus{color:var(--red)}
 .stat.total{border-top:2px solid var(--ink);border-bottom:0;margin-top:4px;font-weight:800;font-size:15px}
 .dialog .btn{width:100%;margin-top:14px;padding:13px;font-size:14px}
+.chipRow{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 12px}
+.chip{border:2px solid #dde3e6;background:#fff;border-radius:12px;padding:7px 10px;
+  font-family:inherit;font-weight:800;font-size:13px;color:var(--ink);cursor:pointer}
+.chip.on{border-color:var(--accent);background:#fff3e5;color:var(--accent-dark)}
+.chip.big{font-size:17px;padding:8px 11px}
+.planTitle{font-size:12.5px;font-weight:800;color:var(--ink-soft);margin:12px 0 2px;text-transform:uppercase;letter-spacing:.3px}
 #toast{
   position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 86px);
   transform:translateX(-50%) translateY(20px);
@@ -129,6 +137,7 @@ canvas{display:block;touch-action:none;position:absolute;left:50%;top:50%;transf
 <div id="stage">
   <canvas id="cv"></canvas>
   <button id="zoomBtn">🗺️</button>
+  <button id="setBtn">⚙️</button>
   <div id="panHint">👆 Wische, um dich umzusehen</div>
 </div>
 
@@ -163,11 +172,16 @@ const SEASON_EMOJI = {Frühling:"🌸",Sommer:"☀️",Herbst:"🍂",Winter:"❄
 const OFFLINE_CAP = 7200;
 
 const LEVELS=[
-  {name:"Dorfladen",         mult:1.0, hallW:400, hallH:460, hallSlots:6,  wingSlots:4, backHalf:3, maxK:2,  maxS:2,  moveCost:2000},
-  {name:"Stadtteil-Markt",  mult:1.6, hallW:460, hallH:520, hallSlots:8,  wingSlots:5, backHalf:4, maxK:3,  maxS:4,  moveCost:6000},
-  {name:"Stadt-Supermarkt", mult:2.4, hallW:520, hallH:600, hallSlots:10, wingSlots:6, backHalf:5, maxK:5,  maxS:8,  moveCost:15000},
-  {name:"Einkaufscenter",   mult:3.4, hallW:600, hallH:700, hallSlots:12, wingSlots:7, backHalf:6, maxK:7,  maxS:16, moveCost:35000},
-  {name:"24h XL-MEGA-MARKT", mult:4.8, hallW:680, hallH:800, hallSlots:14, wingSlots:8, backHalf:7, maxK:10, maxS:30, moveCost:0},
+  {name:"Dorfladen",        mult:1.0, hallW:400, hallH:460,  hallSlots:6,  wingSlots:4,  backHalf:3,  maxK:2,  maxS:2,  parkCap:30,  moveCost:2000},
+  {name:"Stadtteil-Markt",  mult:1.5, hallW:460, hallH:520,  hallSlots:8,  wingSlots:5,  backHalf:4,  maxK:3,  maxS:4,  parkCap:50,  moveCost:6000},
+  {name:"Stadt-Supermarkt", mult:2.1, hallW:520, hallH:600,  hallSlots:10, wingSlots:6,  backHalf:5,  maxK:4,  maxS:6,  parkCap:70,  moveCost:14000},
+  {name:"Grossmarkt",       mult:2.8, hallW:580, hallH:660,  hallSlots:12, wingSlots:7,  backHalf:6,  maxK:5,  maxS:8,  parkCap:90,  moveCost:28000},
+  {name:"Einkaufscenter",   mult:3.6, hallW:640, hallH:720,  hallSlots:14, wingSlots:8,  backHalf:7,  maxK:6,  maxS:12, parkCap:110, moveCost:55000},
+  {name:"Mega-Markt",       mult:4.5, hallW:700, hallH:780,  hallSlots:16, wingSlots:9,  backHalf:8,  maxK:7,  maxS:16, parkCap:130, moveCost:95000},
+  {name:"XL-Markt",         mult:5.5, hallW:760, hallH:840,  hallSlots:18, wingSlots:10, backHalf:9,  maxK:8,  maxS:20, parkCap:150, moveCost:150000},
+  {name:"XXL-Center",       mult:6.6, hallW:820, hallH:900,  hallSlots:20, wingSlots:11, backHalf:10, maxK:9,  maxS:24, parkCap:170, moveCost:230000},
+  {name:"Hyper-Markt",      mult:7.8, hallW:880, hallH:960,  hallSlots:22, wingSlots:12, backHalf:11, maxK:10, maxS:27, parkCap:190, moveCost:340000},
+  {name:"24h Welt-Markt",   mult:9.0, hallW:940, hallH:1020, hallSlots:24, wingSlots:12, backHalf:12, maxK:10, maxS:30, parkCap:210, moveCost:0},
 ];
 function LV(){ return LEVELS[S.level]; }
 function cost(base){ return Math.round(base*LV().mult); }
@@ -198,6 +212,10 @@ const PRODUCTS = [
   {id:"eistee",     name:"Eistee",          emoji:"🧃", dept:"food",    ek:0.8, vk:1.9,  pop:7, season:"Sommer"},
   {id:"suppe",      name:"Suppenbeutel",    emoji:"🥫", dept:"food",    ek:1.0, vk:2.4,  pop:5, season:"Winter"},
   {id:"fondue",     name:"Fonduemischung",  emoji:"🫕", dept:"food",    ek:6.0, vk:11.9, pop:7, season:"Winter"},
+  {id:"pizza",      name:"Tiefkühlpizza",   emoji:"🍕", dept:"food",    ek:2.5, vk:5.5,  pop:7},
+  {id:"tee",        name:"Tee",             emoji:"🍵", dept:"food",    ek:1.8, vk:3.9,  pop:5},
+  {id:"popcorn",    name:"Popcorn",         emoji:"🍿", dept:"food",    ek:1.0, vk:2.4,  pop:5},
+  {id:"sirup",      name:"Sirup",           emoji:"🥤", dept:"food",    ek:1.5, vk:3.4,  pop:5},
   /* ---- Gemüse & Früchte (14) ---- */
   {id:"aepfel",     name:"Äpfel",           emoji:"🍎", dept:"gemuese", ek:1.0, vk:2.4,  pop:8},
   {id:"bananen",    name:"Bananen",         emoji:"🍌", dept:"gemuese", ek:0.9, vk:2.1,  pop:8},
@@ -250,6 +268,10 @@ const PRODUCTS = [
   {id:"blumen",     name:"Blumenstrauss",   emoji:"💐", dept:"nonfood", ek:4.0, vk:8.9,  pop:5, season:"Frühling"},
   {id:"sonnenbrille",name:"Sonnenbrille",   emoji:"🕶️", dept:"nonfood", ek:3.5, vk:7.9,  pop:5, season:"Sommer"},
   {id:"grillkohle", name:"Grillkohle",      emoji:"🔥", dept:"nonfood", ek:3.0, vk:6.9,  pop:4, season:"Sommer"},
+  {id:"buch",       name:"Taschenbuch",     emoji:"📚", dept:"nonfood", ek:6.0, vk:12.9, pop:3},
+  {id:"pflanze",    name:"Zimmerpflanze",   emoji:"🪴", dept:"nonfood", ek:4.5, vk:9.9,  pop:4},
+  {id:"schirm",     name:"Regenschirm",     emoji:"☂️", dept:"nonfood", ek:4.0, vk:8.9,  pop:5, season:"Herbst"},
+  {id:"campstuhl",  name:"Campingstuhl",    emoji:"🪑", dept:"nonfood", ek:7.0, vk:14.9, pop:3, season:"Sommer"},
 ];
 const P = {}; PRODUCTS.forEach(p=>P[p.id]=p);
 
@@ -263,13 +285,13 @@ const STAFF = {
 /* ================= SPIELZUSTAND ================= */
 function defaultState(){
   return {
-    v:2,
+    v:3,
     money:80, day:1, t:0, level:0,
     openH:9, closeH:13,
     shopName:"",
     staffShift:{auffueller:"full", kassierer:"full", putz:"full", sicherheit:"full"},
     hallShelves:3,
-    shelves:{ h0:{prod:"brot",units:15}, h1:{prod:"milch",units:15}, h2:{prod:"pasta",units:10} },
+    shelves:{ h0:{parts:[{prod:"brot",units:15}]}, h1:{parts:[{prod:"milch",units:15}]}, h2:{parts:[{prod:"pasta",units:10}]} },
     lager:{brot:20, milch:20, pasta:15, schoggi:10},
     assortment:["brot","milch","pasta","schoggi"],
     depts:["food"],
@@ -279,8 +301,12 @@ function defaultState(){
     billboard:false, busstop:false, reno:false,
     invoices:[], invSeq:1, revHist:[],
     priceAdj:{}, promoId:null, promoDay:0,
+    liqPct:0, liqSet:{}, liqDay:0, liqAll:false,
+    parking:2,
+    staffRoomLvl:1, shelfTier:1, kasseTier:1, scanTier:1,
+    camTier:0, gateTier:0, office:false, parkMeterTier:0,
     stats:{},
-    dayLog:{rev:0, theft:0, thefts:0, buys:0, sold:0, angry:0, inv:0},
+    dayLog:{rev:0, theft:0, thefts:0, buys:0, sold:0, angry:0, inv:0, caught:0, fines:0, pfees:0},
     lifetime:{rev:0, days:0},
     lastSave:Date.now(),
     tutorialDone:false, moveOffered:false,
@@ -309,13 +335,30 @@ function load(){
       ["money","day","staff","staffRoom","assortment","lager","stats","lifetime","kassen","selfscans","depts","billboard","busstop","reno","tutorialDone"].forEach(k=>{ if(d[k]!==undefined) n[k]=d[k]; });
       n.hallShelves=Math.min(6, Array.isArray(d.shelves)? d.shelves.length : 3);
       n.shelves={};
-      if(Array.isArray(d.shelves)) d.shelves.forEach((sh,i)=>{ if(i<n.hallShelves) n.shelves["h"+i]={prod:sh.prod||null, units:sh.units||0}; });
+      if(Array.isArray(d.shelves)) d.shelves.forEach((sh,i)=>{ if(i<n.hallShelves) n.shelves["h"+i]={parts:[{prod:sh.prod||null, units:sh.units||0}]}; });
       n.kassen=Math.min(n.kassen, LEVELS[0].maxK);
       n.selfscans=Math.min(n.selfscans, LEVELS[0].maxS);
       S=n; ensureStats(); return true;
     }
-    if(d.v!==2) return false;
+    if(d.v===2){
+      const n=Object.assign(defaultState(), d);
+      n.v=3;
+      // Regale: {prod,units} -> {parts:[...]}
+      const sh={};
+      Object.keys(d.shelves||{}).forEach(k=>{
+        const o=d.shelves[k];
+        sh[k]= o && o.parts ? o : {parts:[{prod:(o&&o.prod)||null, units:(o&&o.units)||0}]};
+      });
+      n.shelves=sh;
+      ["liqSet"].forEach(k=>{ if(typeof n[k]!=="object"||!n[k]) n[k]={}; });
+      S=n; ensureStats(); return true;
+    }
+    if(d.v!==3) return false;
     S=Object.assign(defaultState(), d);
+    Object.keys(S.shelves||{}).forEach(k=>{
+      const o=S.shelves[k];
+      if(o && !o.parts) S.shelves[k]={parts:[{prod:o.prod||null,units:o.units||0}]};
+    });
     ensureStats(); return true;
   }catch(e){ canStore=false; return false; }
 }
@@ -327,15 +370,30 @@ const fmtS = n => "CHF " + Math.round(n).toLocaleString("de-CH");
 function season(){ return SEASONS[Math.floor((S.day-1)/5)%4]; }
 function vkOf(id){ return P[id].vk + ((S.priceAdj&&S.priceAdj[id])||0); }
 function isPromo(id){ return S.promoId===id && S.promoDay===S.day; }
+function isLiq(id){
+  if(!S.liqPct) return false;
+  return S.liqAll || (S.liqDay===S.day && S.liqSet && S.liqSet[id]);
+}
+function vkEff(id){
+  let v=vkOf(id);
+  if(isLiq(id)) v*= (1-S.liqPct);
+  return Math.max(0.1, Math.round(v*20)/20);
+}
 function popOf(p){
   let v = !p.season ? p.pop : (p.season===season() ? p.pop*3 : p.pop*0.25);
-  if(isPromo(p.id)) v*=2;                        // Aktion zieht Kundschaft an
-  v /= 1 + ((S.priceAdj&&S.priceAdj[p.id])||0)*0.06;  // teurer = minim weniger beliebt
+  if(isPromo(p.id)) v*=2;                                 // Aktion zieht Kundschaft an
+  if(isLiq(p.id)) v*= 1 + S.liqPct*4;                     // Ausverkauf: je mehr Rabatt, desto begehrter
+  v /= 1 + ((S.priceAdj&&S.priceAdj[p.id])||0)*0.06;      // teurer = minim weniger beliebt
   return v;
 }
-function theftChance(){ return Math.max(0.02, 0.20 - staffOn("sicherheit")*0.08); }
+function scanTime(){ return [3.5,2.8,2.2][S.scanTier-1]||3.5; }
+function kasseRate(){ return [2.6,2.0,1.5][S.kasseTier-1]||2.6; }
+function guardAvail(){ return Math.max(0, staffOn("sicherheit") - (GUARD.busy?1:0)); }
+function theftChance(){
+  return Math.max(0.02, 0.20 - guardAvail()*0.08 - S.camTier*0.03 - S.gateTier*0.02);
+}
 function cleanPct(){ return Math.max(0, Math.min(100, 100 - dirt.length*6 - odirt.length*4)); }
-function staffEff(){ return S.staffRoom<30 ? 0.5 : 1; }
+function staffEff(){ return S.staffRoom<30 ? 0.5 : 1 + 0.08*(S.staffRoomLvl-1); }
 function dayLen(){ return (S.closeH-S.openH)*50; }   // 12h = 600s
 function dayHour(){ return S.openH + (S.t/dayLen())*(S.closeH-S.openH); }
 function pricedHours(a,b){
@@ -411,6 +469,15 @@ function completion(){
   tot+=L.maxK-1;         have+=S.kassen-1;
   tot+=L.maxS-1;         have+=S.selfscans-1;
   tot+=3;                have+=(S.billboard?1:0)+(S.busstop?1:0)+(S.reno?1:0);
+  tot+=1;                have+=(S.office?1:0);
+  tot+=3;                have+=S.staffRoomLvl-1;
+  tot+=2;                have+=S.shelfTier-1;
+  tot+=2;                have+=S.kasseTier-1;
+  tot+=2;                have+=S.scanTier-1;
+  tot+=3;                have+=S.camTier;
+  tot+=2;                have+=S.gateTier;
+  tot+=3;                have+=S.parkMeterTier;
+  tot+=6;                have+=6*Math.min(1, S.parking/L.parkCap);
   return Math.min(1, have/tot);
 }
 
@@ -420,25 +487,72 @@ function completion(){
 let LY=null;
 function buildLayout(){
   const L=LV();
-  const WING_W=132, BACK_H=124, M=24;
-  const hallX=M+WING_W, hallY=M+BACK_H+18;
+  const WING_W=132, M=24, SR_H=76, CO_H=36, OF_W=112;
+  const worldW=M*2+WING_W*2+L.hallW;
+  // Hinterhaus-Raster
+  const backHalfW=L.hallW/2-30;
+  const backCols=Math.max(1, Math.floor((backHalfW-51-66-6)/112)+1);
+  const backRows=Math.ceil(L.backHalf/backCols);
+  const BACK_H=58+(backRows-1)*64+22+38;
+
+  // ---- EIN zusammenhängendes Gebäude: Personal-Etage + Gang + Hinterhaus + Halle ----
+  const srY=M;
+  const gang={x:M+2, y:srY+SR_H, w:worldW-2*M-4, h:CO_H};
+  // Personalräume als Segmente der obersten Etage (durch Innenwände getrennt)
+  const segW=gang.w;
+  const lager ={x:gang.x,                 y:srY, w:Math.round(segW*0.30), h:SR_H};
+  const staffR={x:lager.x+lager.w,        y:srY, w:Math.round(segW*0.27), h:SR_H};
+  const ruhe  ={x:staffR.x+staffR.w,      y:srY, w:Math.round(segW*0.20), h:SR_H};
+  const tech  ={x:ruhe.x+ruhe.w,          y:srY, w:gang.x+gang.w-(ruhe.x+ruhe.w), h:SR_H};
+
+  const hasBL=S.depts.includes("fleisch"), hasBR=S.depts.includes("nonfood");
+  const hasBack=hasBL||hasBR;
+  const backY=gang.y+gang.h;
+  const hallX=M+WING_W;
+  const hallY= hasBack? backY+BACK_H : backY;
   const hall={x:hallX, y:hallY, w:L.hallW, h:L.hallH};
   const aisleX=hall.x+hall.w/2;
-  const worldW=M*2+WING_W*2+L.hallW;
   const plazaTop=hall.y+hall.h+24;
-  const roadY=plazaTop+118;
-  const worldH=roadY+58;
+  const roadY=plazaTop+112;
+  const parkTop=roadY+62;
+  const perRowP=Math.max(6, Math.floor((worldW-70)/46));
+  const parkRows=Math.ceil(L.parkCap/perRowP);
+  const worldH=parkTop+30+parkRows*48+22;
 
   const slots=[];
-  // --- Halle: 2 Spalten, freie Produktwahl ---
+  // ---- Kassenzone & Diebstahlbüro (vorne rechts, bei den Self-Scans) ----
   const doorY0=hall.y+hall.h-8;
-  const ckY0=doorY0-150;
-  const perRow=Math.max(3, Math.floor((L.hallW/2-20)/48));
+  const door={x:aisleX, y:doorY0-6};
+  const ckY=doorY0-118;
+  const office={x:hall.x+hall.w-OF_W-8, y:ckY-84, w:OF_W, h:(doorY0-8)-(ckY-84)};
+  const kassePos=[];
+  for(let kx=hall.x+56; kx<office.x-42 && kassePos.length<L.maxK; kx+=60){
+    if(Math.abs(kx-aisleX)<56) continue;             // Türbereich frei
+    kassePos.push({x:kx, y:ckY});
+  }
+  // Self-Scan-Reihe über die volle Breite (Mittelgang & Büro ausgespart)
+  const scanXs=[];
+  for(let sx=office.x-30; sx>hall.x+36; sx-=46){
+    if(Math.abs(sx-aisleX)<36) continue;             // Mittelgang frei
+    scanXs.push(sx);
+  }
+  const perRow=Math.max(1, scanXs.length);
   const scanRows=Math.ceil(L.maxS/perRow);
-  const scanTop=ckY0-46-(scanRows-1)*40;
-  const shelfBottom=scanTop-46;
+  const oldPods=(LY&&LY.scanPods&&LY.scanPods.length===L.maxS)? LY.scanPods : null;
+  const scanPods=[];
+  for(let i=0;i<L.maxS;i++){
+    const r=Math.floor(i/perRow), cI=i%perRow;
+    scanPods.push({x:scanXs[cI], y:ckY-78-r*40, busy: oldPods? oldPods[i].busy : null});
+  }
+  const scanTop=ckY-78-(scanRows-1)*40;
+  const shelfBottom=Math.min(scanTop, office.y)-64;
+  const scanAnchor={x:office.x-40, y:ckY-38};   // freie Spur zwischen Scans und Kassen
+
+  // ---- Halle: Regalreihen ----
   const rows=Math.ceil(L.hallSlots/2);
-  const rowGap=Math.max(44, Math.min(64, (shelfBottom-(hall.y+96))/Math.max(1,rows-1))), rowY0=hall.y+96;
+  let rowY0=hall.y+100;
+  let rowGap=Math.min(68, (shelfBottom-rowY0)/Math.max(1,rows-1));
+  if(rowGap<50){ rowY0=Math.max(hall.y+84, shelfBottom-(rows-1)*50); rowGap=(shelfBottom-rowY0)/Math.max(1,rows-1); }
   for(let r=0;r<rows;r++){
     for(let cI=0;cI<2;cI++){
       const idx=r*2+cI; if(idx>=L.hallSlots) break;
@@ -446,26 +560,26 @@ function buildLayout(){
       const x=side==="L"? hall.x+92 : hall.x+hall.w-92;
       const y=rowY0+r*rowGap;
       slots.push({id:"h"+idx, zone:"hall", side, x, y,
-        appr:{x: side==="L"? x+55 : x-55, y},
-        route:[{x:aisleX,y},{x:side==="L"? x+55:x-55,y}]});
+        appr:{x: side==="L"? x+58 : x-58, y:y+4},
+        route:[{x:aisleX,y:y+4},{x:side==="L"? x+58:x-58,y:y+4}]});
     }
   }
-  // --- Flügel links (Gemüse) & rechts (Käse) ---
+  // ---- Flügel (Gemüse links, Käse rechts) – angebaut, mit Türe zur Halle ----
   function wing(sideKey, dept){
     const isL=sideKey==="left";
     const wx=isL? M : hallX+L.hallW;
-    const w={x:wx, y:hall.y+70, w:WING_W, h:Math.min(hall.h-160, 90+L.wingSlots*60)};
+    const w={x:wx, y:hall.y+70, w:WING_W, h:Math.min(hall.h-160, 96+L.wingSlots*64)};
     w.doorY=w.y+w.h/2;
     w.corrX=isL? w.x+WING_W-34 : w.x+34;
     w.dept=dept;
     w.slots=[];
     for(let i=0;i<L.wingSlots;i++){
-      const y=w.y+52+i*58;
-      if(y>w.y+w.h-24) break;
+      const y=w.y+58+i*64;
+      if(y>w.y+w.h-26) break;
       const x=isL? w.x+52 : w.x+WING_W-52;
       const s={id:(isL?"L":"R")+i, zone:dept, side:isL?"L":"R", x, y,
-        appr:{x:isL? x+50 : x-50, y},
-        route:[{x:aisleX,y:w.doorY},{x:w.corrX,y:w.doorY},{x:w.corrX,y},{x:isL? x+50:x-50,y}]};
+        appr:{x:isL? x+52 : x-52, y:y+4},
+        route:[{x:aisleX,y:w.doorY},{x:w.corrX,y:w.doorY},{x:w.corrX,y:y+4},{x:isL? x+52:x-52,y:y+4}]};
       slots.push(s); w.slots.push(s);
     }
     return w;
@@ -473,48 +587,40 @@ function buildLayout(){
   const left  = S.depts.includes("gemuese")? wing("left","gemuese") : null;
   const right = S.depts.includes("kaese")?   wing("right","kaese")  : null;
 
-  // --- Hinterraum (Fleisch links, NonFood rechts) ---
-  const hasBL=S.depts.includes("fleisch"), hasBR=S.depts.includes("nonfood");
-  let back=null;
-  if(hasBL||hasBR){
-    back={x:hall.x, y:M, w:hall.w, h:BACK_H, corrY:M+BACK_H-32, hasBL, hasBR};
-    const mkBack=(half,startX,prefix,dept)=>{
+  // ---- Hinterhaus: Fleisch & NonFood, getrennt durch begehbaren Flur (Wirbelsäule) ----
+  let back=null, backL=null, backR=null;
+  if(hasBack){
+    back={x:hall.x, y:backY, w:hall.w, h:BACK_H, corrY:backY+BACK_H-30, hasBL, hasBR};
+    backL={x:hall.x, y:backY, w:hall.w/2-30, h:BACK_H};
+    backR={x:aisleX+30, y:backY, w:hall.w/2-30, h:BACK_H};
+    const mkBack=(half,room,prefix,dept)=>{
+      const startX=room.x+66;
       for(let i=0;i<L.backHalf;i++){
-        const x=startX+i*104;
-        if(x>hall.x+hall.w-60) break;
-        if(half==="L" && x>aisleX-60) break;
-        if(half==="R" && x<aisleX+60) continue;
-        const y=back.y+44;
+        const col=i%backCols, r=Math.floor(i/backCols);
+        const x=startX+col*112;
+        if(x+51>room.x+room.w-6) break;
+        const y=back.y+58+r*64;
+        const chX=x+56;
         slots.push({id:prefix+i, zone:dept, side:"B", x, y,
-          appr:{x, y:y+36},
-          route:[{x:aisleX,y:hall.y+56},{x:aisleX,y:back.corrY},{x,y:back.corrY},{x,y:y+36}]});
+          appr:{x:chX, y:y+4},
+          route:[{x:aisleX,y:hall.y+52},{x:aisleX,y:back.corrY},{x:chX,y:back.corrY},{x:chX,y:y+4}]});
       }
     };
-    if(hasBL) mkBack("L", hall.x+64, "F", "fleisch");
-    if(hasBR) mkBack("R", aisleX+64, "N", "nonfood");
+    if(hasBL) mkBack("L", backL, "F", "fleisch");
+    if(hasBR) mkBack("R", backR, "N", "nonfood");
   }
 
-  // --- Lager, Personalraum, Kassenzeile, Türe ---
-  const lager={x:hall.x+14, y:hall.y+10, w:hall.w/2-58, h:48};
-  const staffR={x:aisleX+44, y:hall.y+10, w:hall.w/2-58, h:48};
-  const doorY=hall.y+hall.h-8;
-  const door={x:aisleX, y:doorY-6};
-  const ckY=ckY0;
-  const kassePos=[];
-  const kSpace=Math.min(60, (hall.w-116)/Math.max(1,L.maxK-1));
-  for(let i=0;i<L.maxK;i++) kassePos.push({x:hall.x+58+i*kSpace, y:ckY});
-  const oldPods=(LY&&LY.scanPods&&LY.scanPods.length===L.maxS)? LY.scanPods : null;
-  const scanPods=[];
-  for(let i=0;i<L.maxS;i++){
-    const r=Math.floor(i/perRow), cI=i%perRow;
-    scanPods.push({x:hall.x+hall.w-44-cI*48, y:ckY-46-r*40, busy: oldPods? oldPods[i].busy : null});
+  const spaces=[];
+  for(let i=0;i<L.parkCap;i++){
+    spaces.push({x:42+(i%perRowP)*46+18, y:parkTop+30+Math.floor(i/perRowP)*48});
   }
-  const scanAnchor={x:hall.x+hall.w-72, y:ckY+14};
-  LY={worldW, worldH, hall, aisleX, left, right, back, lager, staffR,
+  LY={worldW, worldH, hall, aisleX, left, right, back, backL, backR,
+      gang, srY, lager, staffR, ruhe, tech, office,
       door, kassePos, scanPods, scanAnchor, slots, plazaTop, roadY,
-      busStop:{x:hall.x-40, y:plazaTop+76},
-      billboard:{x:hall.x+hall.w+34, y:plazaTop+56},
-      storeTop: back? M : hall.y};
+      parkTop, spaces, perRowP,
+      busStop:{x:hall.x-40, y:plazaTop+72},
+      billboard:{x:hall.x+hall.w+34, y:plazaTop+52},
+      storeTop: srY};
 }
 function slotById(id){ return LY.slots.find(s=>s.id===id); }
 function activeSlots(){
@@ -524,14 +630,20 @@ function activeSlots(){
   });
 }
 function shelfData(id){
-  if(!S.shelves[id]) S.shelves[id]={prod:null,units:0};
-  return S.shelves[id];
+  if(!S.shelves[id]) S.shelves[id]={parts:[]};
+  const d=S.shelves[id];
+  if(!d.parts) S.shelves[id]={parts:[{prod:d.prod||null,units:d.units||0}]};
+  const dd=S.shelves[id];
+  while(dd.parts.length<S.shelfTier) dd.parts.push({prod:null,units:0});
+  return dd;
 }
+function shelfHasStock(id){ return shelfData(id).parts.some(pt=>pt.prod&&pt.units>0); }
 function shelfCap(){ return 20+S.level*5; }
 
 /* ================= LAUFZEIT ================= */
-let customers=[], dirt=[], odirt=[], effects=[];
+let customers=[], dirt=[], odirt=[], effects=[], cars=[];
 const BUS={active:false,x:-100,state:"",t:0,dropped:false};
+const GUARD={x:0,y:0,state:"post",target:null,timer:0,busy:false,init:false};
 let queues={kasse:[]}, scanLine=[];
 function resetQueues(){
   queues={kasse:Array.from({length:10},()=>[])};
@@ -551,8 +663,9 @@ const HAIRS=["#3d2c1e","#1e1e1e","#7a4a1e","#c9a24a","#8a8a8a","#5a3a5a","#a5502
 function stockedSlotFor(prodId){
   let best=null;
   activeSlots().forEach(s=>{
-    const d=S.shelves[s.id];
-    if(d && d.prod===prodId && d.units>0 && (!best || d.units>S.shelves[best.id].units)) best=s;
+    shelfData(s.id).parts.forEach((pt,pi)=>{
+      if(pt.prod===prodId && pt.units>0 && (!best || pt.units>best.units)) best={slot:s, pi, units:pt.units};
+    });
   });
   return best;
 }
@@ -581,14 +694,16 @@ function toAisle(c){
   }
   return pts;
 }
-function spawnCustomer(sx){
+const CAR_COLS=["#d9534f","#4a7fb5","#e8a13a","#5aa060","#8a63b8","#e8e5de","#39444d","#c96b9c","#4aa8a0","#c9a24a"];
+function freeSpace(){
+  const used=new Set(cars.map(cc=>cc.space));
+  for(let i=0;i<Math.min(S.parking,LY.spaces.length);i++) if(!used.has(i)) return i;
+  return -1;
+}
+function mkCustomer(x,y){
   const list=pickList();
-  const browser = list.length===0;           // Schaufenster-Kunde ohne Ware
-  const fromBus = sx!==undefined;
-  const x0 = fromBus? sx : (Math.random()<0.5? -18 : LY.worldW+18);
-  const c={
-    x:x0, y: fromBus? LY.busStop.y+16 : LY.roadY-12,
-    path:[], list, carry:[], browser,
+  return {
+    x, y, path:[], list, carry:[], browser:list.length===0,
     state:"enter", timer:0, wait:0,
     skin:SKINS[Math.random()*SKINS.length|0],
     shirt:SHIRTS[Math.random()*SHIRTS.length|0],
@@ -597,6 +712,24 @@ function spawnCustomer(sx){
     speed:55+Math.random()*25,
     q:null, angry:false, thief:false,
   };
+}
+function spawnCustomer(sx){
+  const fromBus = sx!==undefined;
+  if(!fromBus && Math.random()<0.67){
+    const sp=freeSpace();
+    if(sp<0){
+      cars.push({space:-1, x:-110, y:LY.roadY+6, state:"thru",
+                 col:CAR_COLS[Math.random()*CAR_COLS.length|0], t:0, cust:null});
+      if(Math.random()<0.3) effects.push({x:LY.door.x, y:LY.roadY-4, txt:"🅿️ voll!", t:1.4, col:"#d33a2f"});
+      return;
+    }
+    const pos=LY.spaces[sp];
+    cars.push({space:sp, x:-110, y:pos.y, tx:pos.x, state:"in",
+               col:CAR_COLS[Math.random()*CAR_COLS.length|0], t:0, cust:null});
+    return;
+  }
+  const x0 = fromBus? sx : (Math.random()<0.5? -18 : LY.worldW+18);
+  const c=mkCustomer(x0, fromBus? LY.busStop.y+16 : LY.roadY-12);
   const jx=Math.random()*24-12;
   c.path=[
     {x:LY.door.x+jx, y:LY.roadY-26},
@@ -605,8 +738,39 @@ function spawnCustomer(sx){
   ];
   customers.push(c);
 }
+const METER_FEE=[0,0.5,1.0,1.5];
+function spawnFromCar(car){
+  const pos=LY.spaces[car.space];
+  if(S.parkMeterTier>0){
+    const fee=METER_FEE[S.parkMeterTier];
+    S.money+=fee; S.dayLog.pfees+=fee;
+    effects.push({x:pos.x, y:pos.y-8, txt:"+"+fee.toFixed(2)+" 🅿️", t:1.3, col:"#1f8a4d"});
+  }
+  const c=mkCustomer(pos.x, pos.y-6);
+  c.car=car; car.cust=c;
+  c.path=[
+    {x:pos.x, y:LY.parkTop+12},
+    {x:LY.door.x, y:LY.parkTop+12},
+    {x:LY.door.x, y:LY.roadY-26},
+    {x:LY.door.x, y:LY.plazaTop+50},
+    {x:LY.door.x, y:LY.door.y-20},
+  ];
+  customers.push(c);
+}
 function leaveShop(c){
   c.state="leave";
+  if(c.car){
+    const pos=LY.spaces[c.car.space];
+    c.path=toAisle(c).concat([
+      {x:LY.aisleX, y:LY.door.y-20},
+      {x:LY.door.x, y:LY.plazaTop+54},
+      {x:LY.door.x, y:LY.roadY-26},
+      {x:LY.door.x, y:LY.parkTop+12},
+      {x:pos.x, y:LY.parkTop+12},
+      {x:pos.x, y:pos.y-6},
+    ]);
+    return;
+  }
   const ex=Math.random()<0.5? -24 : LY.worldW+24;
   c.path=toAisle(c).concat([
     {x:LY.aisleX, y:LY.door.y-20},
@@ -632,10 +796,10 @@ function spawnPasser(){
 function nextGoal(c){
   while(c.list.length){
     const id=c.list.shift();
-    const slot=stockedSlotFor(id);
-    if(slot){
-      c.path=toAisle(c).concat(slot.route);
-      c.targetSlot=slot.id; c.targetProd=id; c.state="walk";
+    const hit=stockedSlotFor(id);
+    if(hit){
+      c.path=toAisle(c).concat(hit.slot.route);
+      c.targetSlot=hit.slot.id; c.targetPart=hit.pi; c.targetProd=id; c.state="walk";
       return;
     }
   }
@@ -661,6 +825,7 @@ function goCheckout(c){
   updateQueuePos(c,true);
 }
 function updateQueuePos(c,first){
+  if(!c.q) return;
   let arr, anchor;
   if(c.q.type==="kasse"){
     arr=queues.kasse[c.q.i];
@@ -668,11 +833,13 @@ function updateQueuePos(c,first){
     anchor={x:p.x, y:p.y+36};
   }else{
     arr=scanLine;
-    anchor={x:LY.scanAnchor.x, y:LY.scanAnchor.y+24};
+    anchor={x:LY.scanAnchor.x, y:LY.scanAnchor.y};
   }
   const idx=arr.indexOf(c);
-  const tgt={x:anchor.x, y:anchor.y+idx*24};
-  if(first) c.path=toAisle(c).concat([{x:LY.aisleX,y:anchor.y+36},tgt]);
+  const tgt = c.q.type==="kasse"
+    ? {x:anchor.x, y:anchor.y+idx*24}
+    : {x:anchor.x-idx*22, y:anchor.y};
+  if(first) c.path=toAisle(c).concat([{x:LY.aisleX, y:c.q.type==="kasse"? anchor.y+36 : anchor.y}, tgt]);
   else c.path=[tgt];
 }
 function removeFromQueue(c){
@@ -690,11 +857,12 @@ function removeFromQueue(c){
 }
 function checkout(c,isScan){
   let sum=0;
-  c.carry.forEach(it=>{ sum+=vkOf(it.prod)*it.qty; });
+  c.carry.forEach(it=>{ sum+=vkEff(it.prod)*it.qty; });
   if(isScan && Math.random()<theftChance()){
-    c.thief=true; c.speed*=1.8;
+    c.thief=true; c.stolen=sum;
+    c.speed*=1.4*(1-0.13*S.gateTier);
     S.dayLog.theft+=sum; S.dayLog.thefts++;
-    effects.push({x:c.x,y:c.y-26,txt:"😱 geklaut!",t:1.6,col:"#d33a2f"});
+    effects.push({x:c.x,y:c.y-26,txt:"😱 DIEB! Antippen!",t:2,col:"#d33a2f"});
   }else{
     S.money+=sum; S.dayLog.rev+=sum; S.lifetime.rev+=sum;
     c.carry.forEach(it=>{ S.stats[it.prod].today+=it.qty; S.stats[it.prod].total+=it.qty; S.dayLog.sold+=it.qty; });
@@ -703,10 +871,35 @@ function checkout(c,isScan){
   removeFromQueue(c);
   leaveShop(c);
 }
+function catchThief(c, by){
+  if(!c.thief) return;
+  const sum=c.stolen||0;
+  S.money+=sum;
+  S.dayLog.theft=Math.max(0, S.dayLog.theft-sum);
+  S.dayLog.caught++;
+  c.thief=false; c.stolen=0;
+  if(by==="guard" && S.office){
+    GUARD.busy=true; GUARD.state="escort"; GUARD.target=c;
+    removeFromQueue(c);
+    c.state="escort"; c.speed=48; c.path=[
+      {x:LY.office.x-40, y:LY.office.y+62},
+      {x:LY.office.x+28, y:LY.office.y+62},
+      {x:LY.office.x+LY.office.w/2, y:LY.office.y+LY.office.h/2},
+    ];
+    effects.push({x:c.x,y:c.y-26,txt:"🚔 Erwischt!",t:1.6,col:"#1f8a4d"});
+    return;
+  }
+  let bonus=0;
+  if(S.office){ bonus=100; S.money+=100; S.dayLog.fines+=100; }
+  effects.push({x:c.x,y:c.y-26,txt:"🚔 Erwischt! +"+fmtS(sum+bonus),t:1.8,col:"#1f8a4d"});
+  c.speed=60; c.angry=false;
+  if(GUARD.state==="chase"){ GUARD.state="return"; GUARD.target=null; }
+  leaveShop(c);
+}
 function customerGivesUp(c){
   c.carry.forEach(it=>{
-    const d=S.shelves[it.slot];
-    if(d && d.prod===it.prod) d.units=Math.min(shelfCap(), d.units+it.qty);
+    const pt=shelfData(it.slot).parts[it.pi];
+    if(pt && pt.prod===it.prod) pt.units=Math.min(shelfCap(), pt.units+it.qty);
   });
   c.carry=[]; c.angry=true; S.dayLog.angry++;
   removeFromQueue(c);
@@ -730,12 +923,12 @@ function updateCustomers(dt){
       case "take":
         c.timer-=dt;
         if(c.timer<=0){
-          const d=S.shelves[c.targetSlot];
-          if(d && d.prod===c.targetProd && d.units>0){
-            let qty=Math.min(d.units, 1+Math.floor(Math.random()*2));
-            if(isPromo(c.targetProd)) qty=Math.min(d.units, qty*2);
-            d.units-=qty;
-            c.carry.push({prod:c.targetProd, qty, slot:c.targetSlot});
+          const pt=shelfData(c.targetSlot).parts[c.targetPart];
+          if(pt && pt.prod===c.targetProd && pt.units>0){
+            let qty=Math.min(pt.units, 1+Math.floor(Math.random()*2));
+            if(isPromo(c.targetProd) || (isLiq(c.targetProd)&&S.liqPct>=0.5)) qty=Math.min(pt.units, qty*2);
+            pt.units-=qty;
+            c.carry.push({prod:c.targetProd, qty, slot:c.targetSlot, pi:c.targetPart});
           }
           nextGoal(c);
         }
@@ -753,7 +946,7 @@ function updateCustomers(dt){
         break;
       case "scanning":
         c.scanT+=dt;
-        if(c.scanT>=3.5) checkout(c,true);
+        if(c.scanT>=scanTime()) checkout(c,true);
         break;
       case "pass":
         if(!c.path.length){ customers.splice(i,1); break; }
@@ -762,14 +955,35 @@ function updateCustomers(dt){
           effects.push({x:c.x,y:c.y-26,txt:"🤢 schmutzig hier!",t:1.5,col:"#d33a2f"});
         }
         break;
-      case "leave": if(!c.path.length) customers.splice(i,1); break;
+      case "leave":
+        if(!c.path.length){
+          if(c.car){ c.car.state="out"; c.car.cust=null; }
+          customers.splice(i,1);
+        }
+        break;
+      case "escort":
+        if(!c.path.length){
+          c.state="anzeige"; c.timer=4.5;
+          effects.push({x:LY.office.x+LY.office.w/2, y:LY.office.y-14, txt:"📝 Anzeige...", t:2, col:"#41507a"});
+        }
+        break;
+      case "anzeige":
+        c.timer-=dt;
+        if(c.timer<=0){
+          S.money+=100; S.dayLog.fines+=100;
+          effects.push({x:LY.office.x+LY.office.w/2, y:LY.office.y+10, txt:"+CHF 100 Busse", t:1.8, col:"#1f8a4d"});
+          c.thief=false; c.speed=60;
+          GUARD.busy=false; GUARD.state="return"; GUARD.target=null;
+          leaveShop(c);
+        }
+        break;
     }
   }
 }
 
 /* ================= TAGESABLAUF ================= */
 function attractInterval(){
-  const stocked=activeSlots().filter(s=>{const d=S.shelves[s.id];return d&&d.units>0;}).length;
+  const stocked=activeSlots().filter(s=>shelfHasStock(s.id)).length;
   let iv=5.2/(0.55 + stocked*0.16 + S.depts.length*0.12 + S.level*0.28);
   if(S.billboard) iv/=1.35;
   iv*= 1 + odirt.length*0.06;
@@ -857,15 +1071,54 @@ function tick(dt){
       if(BUS.x>LY.worldW+60){ BUS.active=false; R.bus=70+Math.random()*50; }
     }
   }
+  // Wachmann: Diebe jagen & ins Büro bringen
+  if(!GUARD.init && LY){ GUARD.x=LY.scanAnchor.x+18; GUARD.y=LY.scanAnchor.y; GUARD.init=true; }
+  if(staffOn("sicherheit")>0){
+    if(GUARD.state==="post"){
+      const thief=customers.find(cc=>cc.thief && cc.state==="leave");
+      if(thief){ GUARD.state="chase"; GUARD.target=thief; }
+    }
+    if(GUARD.state==="chase"){
+      const t=GUARD.target;
+      if(!t || !t.thief || !customers.includes(t)){ GUARD.state="return"; GUARD.target=null; }
+      else{
+        const dx=t.x-GUARD.x, dy=t.y-GUARD.y, d=Math.hypot(dx,dy);
+        const sp=128*dt;
+        if(d<14){ catchThief(t,"guard"); if(GUARD.state==="chase"){GUARD.state="return";GUARD.target=null;} }
+        else{ GUARD.x+=dx/d*sp; GUARD.y+=dy/d*sp; }
+      }
+    }
+    if(GUARD.state==="escort"){
+      const t=GUARD.target;
+      if(!t || !customers.includes(t)){ GUARD.busy=false; GUARD.state="return"; GUARD.target=null; }
+      else{ GUARD.x=t.x+16; GUARD.y=t.y+4; if(t.state==="leave"){ GUARD.busy=false; GUARD.state="return"; GUARD.target=null; } }
+    }
+    if(GUARD.state==="return"){
+      const hx=LY.scanAnchor.x+18, hy=LY.scanAnchor.y;
+      const dx=hx-GUARD.x, dy=hy-GUARD.y, d=Math.hypot(dx,dy);
+      if(d<4) GUARD.state="post";
+      else{ const sp=100*dt; GUARD.x+=dx/d*sp; GUARD.y+=dy/d*sp; }
+    }
+  }else{ GUARD.state="post"; GUARD.busy=false; GUARD.target=null; }
+  // Autos bewegen
+  for(let i=cars.length-1;i>=0;i--){
+    const car=cars[i];
+    if(car.state==="thru"){ car.x+=170*dt; if(car.x>LY.worldW+120) cars.splice(i,1); }
+    else if(car.state==="in"){
+      if(Math.abs(car.x-car.tx)>4){ car.x+=Math.sign(car.tx-car.x)*150*dt; }
+      else{ car.x=car.tx; car.state="parked"; spawnFromCar(car); }
+    }
+    else if(car.state==="out"){ car.x+=150*dt; if(car.x>LY.worldW+120) cars.splice(i,1); }
+  }
   // Personalraum
-  S.staffRoom=Math.max(0, S.staffRoom - dt*(100/1500));
+  S.staffRoom=Math.max(0, S.staffRoom - dt*(100/1500)*(1 - 0.15*(S.staffRoomLvl-1)));
   // Personal
   const eff=staffEff();
   const kOn=staffOn("kassierer");
   if(kOn>0){
     R.staffKasse-=dt;
     if(R.staffKasse<=0){
-      R.staffKasse=2.6/(kOn*eff);
+      R.staffKasse=kasseRate()/(kOn*eff);
       for(let i=0;i<S.kassen;i++){
         const q=queues.kasse[i];
         if(q.length && !q[0].path.length){ checkout(q[0],false); break; }
@@ -879,15 +1132,15 @@ function tick(dt){
       R.staffFill=4/(fOn*eff);
       let best=null;
       activeSlots().forEach(s=>{
-        const d=S.shelves[s.id];
-        if(d && d.prod && d.units<shelfCap() && (S.lager[d.prod]||0)>0){
-          if(!best || d.units/shelfCap() < S.shelves[best.id].units/shelfCap()) best=s;
-        }
+        shelfData(s.id).parts.forEach((pt,pi)=>{
+          if(pt.prod && pt.units<shelfCap() && (S.lager[pt.prod]||0)>0){
+            if(!best || pt.units/shelfCap() < best.pt.units/shelfCap()) best={s,pt,pi};
+          }
+        });
       });
       if(best){
-        const d=S.shelves[best.id];
-        const n=Math.min(3, shelfCap()-d.units, S.lager[d.prod]);
-        d.units+=n; S.lager[d.prod]-=n;
+        const n=Math.min(3, shelfCap()-best.pt.units, S.lager[best.pt.prod]);
+        best.pt.units+=n; S.lager[best.pt.prod]-=n;
       }
     }
   }
@@ -936,6 +1189,8 @@ function endDay(){
     <div class="sub">${LV().name} · ${SEASON_EMOJI[season()]} ${season()} · ${String(S.openH).padStart(2,"0")}–${String(S.closeH).padStart(2,"0")} Uhr · ${L.sold} Artikel${L.angry?` · ${L.angry}× genervt`:""}</div>
     <div class="stat"><span>Umsatz</span><b class="plus">+${fmtS(L.rev)}</b></div>
     <div class="stat"><span>Diebstahl (${L.thefts}×)</span><b class="minus">−${fmtS(L.theft)}</b></div>
+    ${L.caught?`<div class="stat"><span>🚔 Diebe gefasst (${L.caught}×) · Bussen</span><b class="plus">+${fmtS(L.fines)}</b></div>`:""}
+    ${L.pfees>0?`<div class="stat"><span>🅿️ Parkgebühren</span><b class="plus">+${fmt(L.pfees)}</b></div>`:""}
     <div class="stat"><span>Wareneinkauf</span><b class="minus">−${fmtS(L.buys)}</b></div>
     <div class="stat"><span>Löhne (${hrs}h${hoursFactor()>1.01?" inkl. Zuschlag":""})</span><b class="minus">−${fmtS(wages)}</b></div>
     ${ads?`<div class="stat"><span>Werbetafel</span><b class="minus">−${fmtS(ads)}</b></div>`:""}
@@ -944,15 +1199,70 @@ function endDay(){
     <div class="stat total"><span>Tagesgewinn</span><b class="${profit>=0?'plus':'minus'}">${profit>=0?"+":"−"}${fmtS(Math.abs(profit))}</b></div>
     ${best?`<div class="stat"><span>🏆 Bestseller</span><b>${P[best].emoji} ${P[best].name} (${S.stats[best].today}×)</b></div>`:""}
     ${flop?`<div class="stat"><span>🐌 Ladenhüter</span><b>${P[flop].emoji} ${P[flop].name} (${S.stats[flop].today}×)</b></div>`:""}
-    <button class="btn" onclick="startNextDay()">Tag ${S.day+1} starten ▶</button>
+    <button class="btn" onclick="showPlanner()">Weiter zur Tagesplanung ▶</button>
   `);
   S.assortment.forEach(id=>{ S.stats[id].yesterday=S.stats[id].today; S.stats[id].today=0; });
   S.day++; S.t=0; S.lifetime.days++;
-  S.dayLog={rev:0,theft:0,thefts:0,buys:0,sold:0,angry:0,inv:0};
+  S.dayLog={rev:0,theft:0,thefts:0,buys:0,sold:0,angry:0,inv:0,caught:0,fines:0,pfees:0};
   dirt=dirt.slice(0,Math.floor(dirt.length/2));
   odirt=odirt.slice(0,Math.floor(odirt.length/2));
   save();
 }
+let PLAN=null;
+window.showPlanner=function(){
+  if(!PLAN) PLAN={promo:null, liqPct:(S.liqAll?S.liqPct:0), liqIds:{}, all:S.liqAll};
+  const cAkt=cost(30);
+  let h=`<h2>🗓️ Tagesplanung – Tag ${S.day}</h2>
+  <div class="sub">${SEASON_EMOJI[season()]} ${season()} · Was planst du für heute?</div>`;
+  h+=`<div class="planTitle">🔥 Tages-Aktion (Kunden kaufen 2×) · ${fmtS(cAkt)}</div><div class="chipRow">`;
+  h+=`<button class="chip ${PLAN.promo===null?"on":""}" onclick="planPromo(null)">Keine</button>`;
+  S.assortment.forEach(id=>{
+    h+=`<button class="chip big ${PLAN.promo===id?"on":""}" onclick="planPromo('${id}')" title="${P[id].name}">${P[id].emoji}</button>`;
+  });
+  h+=`</div>`;
+  h+=`<div class="planTitle">🏷️ Liquidation / Ausverkauf (Rabatt lockt Käufer)</div><div class="chipRow">`;
+  h+=`<button class="chip ${PLAN.liqPct===0?"on":""}" onclick="planLiqPct(0)">aus</button>`;
+  [0.25,0.33,0.5,0.75].forEach(p=>{
+    h+=`<button class="chip ${PLAN.liqPct===p?"on":""}" onclick="planLiqPct(${p})">−${Math.round(p*100)}%</button>`;
+  });
+  h+=`</div>`;
+  if(PLAN.liqPct>0){
+    h+=`<div class="chipRow">`;
+    h+=`<button class="chip ${PLAN.all?"on":""}" onclick="planAll()">ALLES</button>`;
+    S.assortment.forEach(id=>{
+      h+=`<button class="chip big ${(!PLAN.all&&PLAN.liqIds[id])?"on":""}" onclick="planLiqProd('${id}')" title="${P[id].name}">${P[id].emoji}</button>`;
+    });
+    h+=`</div>
+    <p style="font-size:12px;color:var(--ink-soft);margin:0 0 4px">Je höher der Rabatt, desto schneller ist die Ware weg – perfekt für Saisonartikel oder vor dem Umzug. «ALLES» gilt, bis du es hier wieder ausschaltest.</p>`;
+  }
+  if(S.liqAll && PLAN.all && PLAN.liqPct>0){
+    h+=`<p style="font-size:12px;color:var(--accent-dark);font-weight:700">🏷️ Total-Liquidation läuft (−${Math.round(S.liqPct*100)}%).</p>`;
+  }
+  h+=`<button class="btn green" onclick="planStart()">Tag ${S.day} starten ▶</button>
+  <button class="btn sec" onclick="skipPlan()">Ohne Planung starten</button>`;
+  showDialog(h);
+};
+window.planPromo=function(id){ PLAN.promo = (PLAN.promo===id)? null : id; showPlanner(); };
+window.planLiqPct=function(p){ PLAN.liqPct=p; if(p===0){PLAN.all=false;PLAN.liqIds={};} showPlanner(); };
+window.planLiqProd=function(id){ PLAN.all=false; if(PLAN.liqIds[id]) delete PLAN.liqIds[id]; else PLAN.liqIds[id]=true; showPlanner(); };
+window.planAll=function(){ PLAN.all=!PLAN.all; if(PLAN.all) PLAN.liqIds={}; showPlanner(); };
+window.planStart=function(){
+  if(PLAN.promo){
+    if(pay(cost(30))){ S.promoId=PLAN.promo; S.promoDay=S.day;
+      toast(`🔥 AKTION heute: ${P[PLAN.promo].emoji} ${P[PLAN.promo].name} – doppelt gekauft!`, true);
+    }else toast("Aktion nicht bezahlbar – ohne Aktion gestartet.");
+  }
+  if(PLAN.liqPct>0){
+    S.liqPct=PLAN.liqPct;
+    if(PLAN.all){ S.liqAll=true; toast(`🏷️ AUSVERKAUF: Alles −${Math.round(S.liqPct*100)}%!`, true); }
+    else{ S.liqAll=false; S.liqSet=Object.assign({},PLAN.liqIds); S.liqDay=S.day;
+      const n=Object.keys(S.liqSet).length;
+      if(n) toast(`🏷️ Liquidation heute: ${n} Produkt${n>1?"e":""} −${Math.round(S.liqPct*100)}%`);
+    }
+  }else{ S.liqAll=false; S.liqPct=0; S.liqSet={}; }
+  PLAN=null; startNextDay();
+};
+window.skipPlan=function(){ PLAN=null; startNextDay(); };
 function startNextDay(){
   const dead=S.invoices.find(v=>S.day>v.due+MONTH_DAYS);
   if(dead){ gameOver(dead); return; }
@@ -976,16 +1286,17 @@ window.gameOver=gameOver;
 window.restartGame=function(){
   const nm=S.shopName;
   S=defaultState();
-  S.shopName=nm; S.tutorialDone=true;
+  S.shopName=nm; S.tutorialDone=false;
   ensureStats();
-  customers=[]; dirt=[]; odirt=[]; effects=[];
+  customers=[]; dirt=[]; odirt=[]; effects=[]; cars=[];
+  GUARD.state="post"; GUARD.busy=false; GUARD.target=null; GUARD.init=false;
   buildLayout(); resetQueues(); BUS.active=false;
   R={spawn:2, dirtT:10, odirtT:14, bus:40, autoSave:8,
      staffKasse:0, staffFill:0, staffPutz:0, lunch:false, rush:false};
   dayEnding=false;
   camCenterDoor(); save(); closeDialog(); closePanel();
-  paused=false;
   toast("🌱 Neuanfang – zeig's allen!", true);
+  giftDialog();
 };
 
 /* ================= LEVEL-AUFSTIEG ================= */
@@ -1001,9 +1312,26 @@ function offerMove(){
     <div class="stat"><span>Umzugskosten</span><b class="minus">−${fmtS(LV().moveCost)}</b></div>
     <p style="font-size:12px;color:var(--ink-soft);margin-top:8px">Personal, Sortiment und Lager ziehen mit um. Einrichtung und Anbauten baust du im neuen Laden wieder auf (Level ${S.level+2}-Preise).</p>
     <button class="btn green" onclick="moveLevel()" ${S.money<LV().moveCost?"disabled":""}>Umziehen! 🚚</button>
+    <button class="btn" onclick="chooseLiqMove()">🏷️ Erst Liquidation – alles muss raus!</button>
     <button class="btn sec" onclick="closeDialog();paused=false;">Später (siehe «Ausbau»)</button>
   `);
 }
+window.chooseLiqMove=function(){
+  showDialog(`
+    <h2>🏷️ Total-Liquidation</h2>
+    <div class="sub">Alles wird rabattiert, damit vor dem Umzug Lager und Regale leer sind. Wie viel Rabatt?</div>
+    <div class="chipRow" style="justify-content:center">
+      ${[0.25,0.33,0.5,0.75].map(p=>`<button class="chip" style="font-size:15px" onclick="setLiqAll(${p})">−${Math.round(p*100)}%</button>`).join("")}
+    </div>
+    <p style="font-size:12px;color:var(--ink-soft)">Je höher der Rabatt, desto schneller stürmen die Leute den Laden. Der Umzug wartet im «Ausbau»-Tab auf dich.</p>
+    <button class="btn sec" onclick="closeDialog();paused=false;">Abbrechen</button>
+  `);
+};
+window.setLiqAll=function(p){
+  S.liqAll=true; S.liqPct=p;
+  closeDialog(); paused=false; save();
+  toast(`🏷️ AUSVERKAUF! Alles −${Math.round(p*100)}% – die Bude wird gestürmt!`, true);
+};
 function moveLevel(){
   const c=LV().moveCost;
   if(S.money<c){ toast("💸 Zu wenig Geld für den Umzug!"); return; }
@@ -1011,23 +1339,53 @@ function moveLevel(){
   S.hallShelves=3; S.kassen=1; S.selfscans=1;
   S.depts=["food"];
   S.billboard=false; S.busstop=false; S.reno=false;
+  S.parking=2; S.staffRoomLvl=1; S.shelfTier=1; S.kasseTier=1; S.scanTier=1;
+  S.camTier=0; S.gateTier=0; S.office=false; S.parkMeterTier=0;
+  S.liqAll=false; S.liqPct=0; S.liqSet={}; S.promoId=null;
   S.shelves={}; S.moveOffered=false;
-  customers=[]; dirt=[]; odirt=[]; effects=[]; resetQueues(); BUS.active=false;
+  customers=[]; dirt=[]; odirt=[]; effects=[]; cars=[]; resetQueues(); BUS.active=false;
+  GUARD.state="post"; GUARD.busy=false; GUARD.target=null; GUARD.init=false;
   buildLayout();
   const tops=S.assortment.filter(id=>P[id].dept==="food").slice(0,3);
   tops.forEach((id,i)=>{
     const n=Math.min(shelfCap(), S.lager[id]||0);
-    S.shelves["h"+i]={prod:id, units:n};
+    S.shelves["h"+i]={parts:[{prod:id, units:n}]};
     S.lager[id]=(S.lager[id]||0)-n;
   });
   camCenterDoor(); save();
   showDialog(`
     <h2>🚚 Willkommen im ${LV().name}!</h2>
-    <div class="sub">Level ${S.level+1} von 5 · alles ist grösser – bau ihn wieder auf 100% aus!</div>
-    <button class="btn" onclick="closeDialog();paused=false;">Laden eröffnen ▶</button>
+    <div class="sub">Level ${S.level+1} von 10 · alles ist grösser – bau ihn wieder auf 100% aus!</div>
+    <p style="font-size:13px;color:var(--ink-soft)">Neuer Laden, neue Chance: Sortiment behalten oder neu zusammenstellen? Beim Neustart wird das restliche Lager zu 50% des Einkaufspreises verkauft.</p>
+    <button class="btn" onclick="closeDialog();paused=false;">Sortiment behalten ✓</button>
+    <button class="btn sec" onclick="resetAssortment()">🗑️ Neu wählen (zurück zum Basis-Sortiment)</button>
   `);
 }
 window.moveLevel=moveLevel;
+window.resetAssortment=function(){
+  const keep=["brot","milch","pasta","schoggi"];
+  let refund=0;
+  Object.values(S.shelves).forEach(sh=>(sh.parts||[]).forEach(pt=>{
+    if(pt.prod){ S.lager[pt.prod]=(S.lager[pt.prod]||0)+pt.units; pt.units=0; if(!keep.includes(pt.prod)) pt.prod=null; }
+  }));
+  S.assortment.slice().forEach(id=>{
+    if(!keep.includes(id)){
+      refund+=(S.lager[id]||0)*P[id].ek*0.5;
+      delete S.lager[id]; delete S.priceAdj[id];
+    }
+  });
+  S.assortment=keep.slice();
+  ensureStats();
+  S.money+=refund;
+  keep.slice(0,3).forEach((id,i)=>{
+    const pt=shelfData("h"+i).parts[0];
+    pt.prod=id;
+    const n=Math.min(shelfCap(), S.lager[id]||0);
+    pt.units=n; S.lager[id]=(S.lager[id]||0)-n;
+  });
+  toast(refund>0? "♻️ Sortiment neu! Restlager verkauft: +"+fmtS(Math.round(refund)) : "♻️ Sortiment auf Basis zurückgesetzt!", true);
+  closeDialog(); paused=false; save();
+};
 
 /* ================= OFFLINE-FORTSCHRITT ================= */
 function offlineSim(){
@@ -1036,7 +1394,7 @@ function offlineSim(){
   const canSell=S.staff.kassierer>0 || S.selfscans>0;
   if(!canSell) return;
   let shelfUnits=0;
-  activeSlots().forEach(s=>{ const d=S.shelves[s.id]; if(d) shelfUnits+=d.units; });
+  activeSlots().forEach(s=>{ shelfData(s.id).parts.forEach(pt=>shelfUnits+=pt.units); });
   let lagerUnits=0;
   if(S.staff.auffueller>0) Object.keys(S.lager).forEach(k=>lagerUnits+=S.lager[k]);
   const avail=shelfUnits+lagerUnits;
@@ -1045,13 +1403,14 @@ function offlineSim(){
   let sold=Math.min(avail, Math.floor(elapsed/5*0.3*speed*1.8));
   if(sold<=0) return;
   let vkSum=0,n=0;
-  activeSlots().forEach(s=>{ const d=S.shelves[s.id]; if(d&&d.prod){ vkSum+=vkOf(d.prod); n++; } });
+  activeSlots().forEach(s=>{ shelfData(s.id).parts.forEach(pt=>{ if(pt.prod){ vkSum+=vkEff(pt.prod); n++; } }); });
   const avgVK=n? vkSum/n : 2;
   let toSell=sold;
   activeSlots().forEach(s=>{
-    const d=S.shelves[s.id]; if(!d) return;
-    const take=Math.min(d.units, Math.ceil(toSell*(d.units/Math.max(1,shelfUnits))));
-    d.units-=take; toSell-=take;
+    shelfData(s.id).parts.forEach(pt=>{
+      const take=Math.min(pt.units, Math.ceil(toSell*(pt.units/Math.max(1,shelfUnits))));
+      pt.units-=take; toSell-=take;
+    });
   });
   if(toSell>0 && S.staff.auffueller>0){
     for(const k of Object.keys(S.lager)){
@@ -1085,19 +1444,31 @@ function offlineSim(){
 const cv=$("cv"), ctx=cv.getContext("2d");
 let stW=0, stH=0, sc=1, zoomFit=false;
 const cam={x:0,y:0};
+/* ===== ISOMETRISCHE PROJEKTION (echte 3D-Vogelperspektive) ===== */
+const IX=0.82, IY=0.46, WALLH=30;
+function PJ(x,y,h){ return {x:(x-y)*IX, y:(x+y)*IY-(h||0)}; }
+function UNPJ(sx,sy){ const a=sx/IX, b=sy/IY; return {x:(b+a)/2, y:(b-a)/2}; }
+function isoBounds(){
+  const W=LY.worldW, H=LY.worldH;
+  return {minx:PJ(-40,H+40).x, maxx:PJ(W+40,-40).x,
+          miny:PJ(-40,-40).y-WALLH-40, maxy:PJ(W+60,H+60).y+30};
+}
 function computeScale(){
-  if(zoomFit) sc=Math.min(stW/LY.worldW, stH/LY.worldH);
-  else sc=stW/460;
+  const B=isoBounds();
+  if(zoomFit) sc=Math.min(stW/(B.maxx-B.minx), stH/(B.maxy-B.miny));
+  else sc=stW/620;
 }
 function clampCam(){
+  const B=isoBounds();
   const vw=stW/sc, vh=stH/sc;
-  cam.x = LY.worldW<=vw ? (LY.worldW-vw)/2 : Math.max(0, Math.min(LY.worldW-vw, cam.x));
-  cam.y = LY.worldH<=vh ? (LY.worldH-vh)/2 : Math.max(0, Math.min(LY.worldH-vh, cam.y));
+  cam.x = (B.maxx-B.minx)<=vw ? B.minx-(vw-(B.maxx-B.minx))/2 : Math.max(B.minx, Math.min(B.maxx-vw, cam.x));
+  cam.y = (B.maxy-B.miny)<=vh ? B.miny-(vh-(B.maxy-B.miny))/2 : Math.max(B.miny, Math.min(B.maxy-vh, cam.y));
 }
 function camCenterDoor(){
   computeScale();
-  cam.x=LY.door.x - (stW/sc)/2;
-  cam.y=LY.door.y - (stH/sc)*0.62;
+  const d=PJ(LY.door.x, LY.door.y, 0);
+  cam.x=d.x-(stW/sc)/2;
+  cam.y=d.y-(stH/sc)*0.60;
   clampCam();
 }
 function resize(){
@@ -1109,6 +1480,30 @@ function resize(){
   computeScale(); clampCam();
 }
 window.addEventListener("resize",resize);
+$("setBtn").onclick=()=>{ openSettings(); };
+window.openSettings=function(){
+  paused=true;
+  showDialog(`
+    <h2>⚙️ Einstellungen</h2>
+    <div class="sub">Markt-Tycoon · by Nextform Games</div>
+    <div class="stat"><span>🏪 Laden</span><b>${S.shopName||"—"}</b></div>
+    <div class="stat"><span>📈 Fortschritt</span><b>Level ${S.level+1}/10 · Tag ${S.day}</b></div>
+    <div class="stat"><span>💰 Konto</span><b>${fmtS(S.money)}</b></div>
+    <button class="btn sec" onclick="closeDialog();askName(1);">✏️ Ladenname ändern</button>
+    <button class="btn danger" onclick="confirmReset()">🔒 Laden schliessen & neu beginnen</button>
+    <button class="btn" onclick="closeDialog();paused=false;">Weiter spielen ▶</button>
+  `);
+};
+window.confirmReset=function(){
+  showDialog(`
+    <h2>🔒 Wirklich schliessen?</h2>
+    <div class="sub">Dein ${S.shopName||"Laden"} wird für immer geschlossen.</div>
+    <p style="font-size:13px;color:var(--ink-soft)">Level, Geld, Sortiment, Personal und alle Ausbauten gehen verloren –
+    du startest wieder bei <b>Level 1</b> im kleinen Dorfladen. Nur der Ladenname bleibt erhalten.</p>
+    <button class="btn danger" onclick="restartGame()">Ja, Laden schliessen & neu beginnen 🔄</button>
+    <button class="btn sec" onclick="closeDialog();paused=false;">Abbrechen</button>
+  `);
+};
 $("zoomBtn").onclick=()=>{
   zoomFit=!zoomFit;
   $("zoomBtn").textContent=zoomFit?"🔍":"🗺️";
@@ -1124,6 +1519,7 @@ function rr(x,y,w,h,r){
   ctx.closePath();
 }
 function shade(hex,f){
+  if(typeof hex!=="string" || hex[0]!=="#") return typeof hex==="string"? hex : "#888";
   const n=parseInt(hex.slice(1),16);
   const r=Math.min(255,Math.round(((n>>16)&255)*f)),
         g=Math.min(255,Math.round(((n>>8)&255)*f)),
@@ -1141,7 +1537,15 @@ const DEPT_STYLE={
   fleisch:{frame:"#a05656", inner:"#f2e2e2", cool:true},
   nonfood:{frame:"#7c828c", inner:"#c2c7ce"},
 };
+const DRLIST=[];
+function D(z,fn){ DRLIST.push({z,fn}); }
+function BB(x,y,fn){ D(x+y+0.5, ()=>{ const p=PJ(x,y); ctx.save(); ctx.translate(p.x,p.y); fn(); ctx.restore(); }); }
+const LBLIST=[];
+function LBB(x,y,fn){ LBLIST.push(()=>{ const p=PJ(x,y); ctx.save(); ctx.translate(p.x,p.y); fn(); ctx.restore(); }); }
 function drawPerson(x,y,shirt,skin,hair,o){
+  D(x+y+0.6, ()=>{ const p=PJ(x,y); drawPersonScreen(p.x,p.y,shirt,skin,hair,o); });
+}
+function drawPersonScreen(x,y,shirt,skin,hair,o){
   o=o||{};
   ctx.fillStyle="rgba(0,0,0,.15)";
   ctx.beginPath(); ctx.ellipse(x,y+9,8,3.5,0,0,7); ctx.fill();
@@ -1153,13 +1557,25 @@ function drawPerson(x,y,shirt,skin,hair,o){
     ctx.beginPath(); ctx.moveTo(x-3,y+3); ctx.lineTo(x-3+lp,y+8); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(x+3,y+3); ctx.lineTo(x+3-lp,y+8); ctx.stroke();
   }
-  ctx.fillStyle=shirt; rr(x-7,y-8+bob*.3,14,15,6); ctx.fill();
-  if(o.apron){ ctx.fillStyle=o.apron; rr(x-5,y-5+bob*.3,10,11,4); ctx.fill(); }
+  const bgr=ctx.createLinearGradient(0,y-8,0,y+7);
+  bgr.addColorStop(0, shirt); bgr.addColorStop(1, shade(shirt,0.72));
+  ctx.fillStyle=bgr; rr(x-7,y-8+bob*.3,14,15,6); ctx.fill();
+  ctx.strokeStyle="rgba(0,0,0,.22)"; ctx.lineWidth=1;
+  rr(x-7,y-8+bob*.3,14,15,6); ctx.stroke();
+  ctx.fillStyle="rgba(255,255,255,.22)"; rr(x-6,y-7.5+bob*.3,5,4,2); ctx.fill();
+  if(o.apron){ ctx.fillStyle=o.apron; rr(x-5,y-5+bob*.3,10,11,4); ctx.fill();
+    ctx.fillStyle="rgba(0,0,0,.10)"; rr(x-5,y+1+bob*.3,10,5,3); ctx.fill(); }
   if(o.vest){ ctx.strokeStyle=o.vest; ctx.lineWidth=2.5;
     ctx.beginPath(); ctx.moveTo(x-6,y-7+bob*.3); ctx.lineTo(x+6,y+2+bob*.3); ctx.stroke(); }
-  ctx.fillStyle=skin; ctx.beginPath(); ctx.arc(x,y-13+bob*.5,6.5,0,7); ctx.fill();
+  const hgr=ctx.createLinearGradient(0,y-19,0,y-7);
+  hgr.addColorStop(0, skin); hgr.addColorStop(1, shade(skin,0.80));
+  ctx.fillStyle=hgr; ctx.beginPath(); ctx.arc(x,y-13+bob*.5,6.5,0,7); ctx.fill();
+  ctx.strokeStyle="rgba(0,0,0,.18)"; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.arc(x,y-13+bob*.5,6.5,0,7); ctx.stroke();
   ctx.fillStyle=hair||"#3d2c1e";
   ctx.beginPath(); ctx.arc(x,y-14.3+bob*.5,6.1,Math.PI,2*Math.PI); ctx.fill();
+  ctx.fillStyle="rgba(255,255,255,.30)";
+  ctx.beginPath(); ctx.arc(x-2.4,y-15.6+bob*.5,1.8,0,7); ctx.fill();
   if(o.hat){
     ctx.fillStyle=o.hat;
     rr(x-7,y-20.5+bob*.5,14,3.5,2); ctx.fill();
@@ -1183,28 +1599,22 @@ function drawStaff(now,dtv){
       drawPerson(p.x-2,p.y-26,"#2e6da4","#e8bd90","#4a3220",{apron:"#ff9d3f"});
     }
   }
-  if(staffOn("sicherheit")>0){
-    const p=LY.scanAnchor;
-    drawPerson(p.x+34,p.y-18,"#2f3b46","#c98a5b","#1e1e1e",{hat:"#2f3b46",vest:"#ffd23f"});
-    ctx.font="9px -apple-system,sans-serif"; ctx.textAlign="center";
-    ctx.fillText("👀", p.x+34, p.y-48);
-  }
   if(staffOn("putz")>0){
     const tgt=dirt[0]||odirt[0];
     let moving=false;
     if(tgt){ moving=!moveVis(VIS.putz,tgt.x,tgt.y-8,46,dtv); }
     else{ moving=!moveVis(VIS.putz,LY.aisleX+40,LY.hall.y+130,32,dtv); }
     drawPerson(VIS.putz.x,VIS.putz.y,"#5aa060","#f2c9a0","#7a4a1e",{apron:"#d9e2e8",phase:moving?now*9:undefined});
-    ctx.font="11px -apple-system,sans-serif"; ctx.textAlign="center";
-    ctx.fillText("🧹", VIS.putz.x+9, VIS.putz.y+2);
+    BB(VIS.putz.x+9,VIS.putz.y,()=>{ ctx.font="11px -apple-system,sans-serif"; ctx.textAlign="center"; ctx.fillText("🧹",0,2); });
   }
   if(staffOn("auffueller")>0){
     let bestS=null, worst=1;
     activeSlots().forEach(s=>{
-      const d=S.shelves[s.id];
-      if(d && d.prod && d.units<shelfCap() && (S.lager[d.prod]||0)>0 && d.units/shelfCap()<worst){
-        worst=d.units/shelfCap(); bestS=s;
-      }
+      shelfData(s.id).parts.forEach(pt=>{
+        if(pt.prod && pt.units<shelfCap() && (S.lager[pt.prod]||0)>0 && pt.units/shelfCap()<worst){
+          worst=pt.units/shelfCap(); bestS=s;
+        }
+      });
     });
     const home={x:LY.lager.x+LY.lager.w/2, y:LY.lager.y+LY.lager.h+16};
     let moving=false;
@@ -1213,8 +1623,136 @@ function drawStaff(now,dtv){
       else{ moving=!moveVis(VIS.auff,home.x,home.y,50,dtv); if(!moving) VIS.auff.carry=true; }
     }else{ moving=!moveVis(VIS.auff,home.x,home.y,40,dtv); }
     drawPerson(VIS.auff.x,VIS.auff.y,"#d08a30","#c98a5b","#1e1e1e",{apron:"#eef1f3",phase:moving?now*9:undefined});
-    if(VIS.auff.carry){ ctx.font="11px -apple-system,sans-serif"; ctx.fillText("📦", VIS.auff.x+10, VIS.auff.y-4); }
+    if(VIS.auff.carry){ BB(VIS.auff.x+10,VIS.auff.y,()=>{ ctx.font="11px -apple-system,sans-serif"; ctx.fillText("📦",0,-4); }); }
   }
+}
+
+/* ================= TEXTUREN & SPRITES ================= */
+const TEX={done:false};
+function mkCanvas(w,h){ const c=document.createElement("canvas"); c.width=w; c.height=h; return c; }
+function initTex(){
+  if(TEX.done) return; TEX.done=true;
+  function texture(w,h,fn){ const c=mkCanvas(w,h); fn(c.getContext("2d"),w,h); return ctx.createPattern(c,"repeat"); }
+  TEX.grass=texture(120,120,(g,w,h)=>{
+    g.fillStyle="#7aa96b"; g.fillRect(0,0,w,h);
+    for(let i=0;i<260;i++){
+      g.fillStyle=Math.random()<0.5? "rgba(255,255,225,.06)":"rgba(20,70,20,.09)";
+      g.fillRect(Math.random()*w, Math.random()*h, 2.2, 2.2);
+    }
+    for(let i=0;i<42;i++){
+      const x=Math.random()*w, y=Math.random()*h;
+      g.strokeStyle="rgba(45,95,45,.32)"; g.lineWidth=1.2;
+      g.beginPath(); g.moveTo(x,y); g.quadraticCurveTo(x+1,y-3,x+2.5,y-5.5); g.stroke();
+    }
+  });
+  TEX.plaza=texture(64,64,(g,w,h)=>{
+    g.fillStyle="#cdc9be"; g.fillRect(0,0,w,h);
+    g.fillStyle="#c4c0b4"; g.fillRect(0,0,32,32); g.fillRect(32,32,32,32);
+    for(let i=0;i<90;i++){ g.fillStyle="rgba(0,0,0,.05)"; g.fillRect(Math.random()*w,Math.random()*h,1.7,1.7); }
+    g.strokeStyle="rgba(0,0,0,.09)"; g.lineWidth=1;
+    g.strokeRect(0.5,0.5,32,32); g.strokeRect(32.5,32.5,31,31);
+  });
+  TEX.asphalt=texture(90,90,(g,w,h)=>{
+    g.fillStyle="#565b61"; g.fillRect(0,0,w,h);
+    for(let i=0;i<320;i++){ g.fillStyle=Math.random()<0.5?"rgba(255,255,255,.05)":"rgba(0,0,0,.10)"; g.fillRect(Math.random()*w,Math.random()*h,1.8,1.8); }
+    g.strokeStyle="rgba(0,0,0,.12)"; g.lineWidth=1;
+    g.beginPath(); g.moveTo(8,70); g.quadraticCurveTo(28,58,46,74); g.stroke();
+  });
+  TEX.hall=texture(96,96,(g,w,h)=>{
+    for(let y=0;y<h;y+=16){
+      g.fillStyle=(y/16)%2? "#eadfc7":"#efe6d2"; g.fillRect(0,y,w,16);
+      g.fillStyle="rgba(120,90,50,.14)"; g.fillRect(0,y,w,1.2);
+      const off=((y/16)%2)*48;
+      g.fillStyle="rgba(120,90,50,.11)"; g.fillRect((24+off)%w,y,1.2,16); g.fillRect((72+off)%w,y,1.2,16);
+    }
+    for(let i=0;i<70;i++){ g.fillStyle="rgba(140,105,60,.06)"; g.fillRect(Math.random()*w,Math.random()*h,2.4,1.2); }
+  });
+  TEX.corr=texture(64,64,(g,w,h)=>{
+    g.fillStyle="#d5d0c2"; g.fillRect(0,0,w,h);
+    g.strokeStyle="rgba(0,0,0,.09)"; g.lineWidth=1;
+    for(let x=0;x<=w;x+=32){ g.beginPath(); g.moveTo(x+.5,0); g.lineTo(x+.5,h); g.stroke(); }
+    for(let y=0;y<=h;y+=32){ g.beginPath(); g.moveTo(0,y+.5); g.lineTo(w,y+.5); g.stroke(); }
+    for(let i=0;i<60;i++){ g.fillStyle="rgba(0,0,0,.045)"; g.fillRect(Math.random()*w,Math.random()*h,1.6,1.6); }
+  });
+}
+const SPR={};
+function rrG(g,x,y,w,h,r){ g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r); g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath(); }
+function vgrad(g,y,h,c1,c2){ const gr=g.createLinearGradient(0,y,0,y+h); gr.addColorStop(0,c1); gr.addColorStop(1,c2); return gr; }
+function sprite(key,w,h,fn){
+  if(SPR[key]) return SPR[key];
+  const c=mkCanvas(w*2,h*2); const g=c.getContext("2d"); g.scale(2,2);
+  g.textAlign="center"; fn(g);
+  c._w=w; c._h=h; SPR[key]=c; return c;
+}
+function blit(c,x,y){ ctx.drawImage(c,x,y,c._w,c._h); }
+function shelfSprite(st){
+  return sprite("sh_"+st.frame+(st.cool?"_c":""),104,74,(g)=>{
+    g.save(); g.fillStyle="rgba(0,0,0,.30)"; try{g.filter="blur(4px)";}catch(e){}
+    g.beginPath(); g.ellipse(52,62,44,7,0,0,7); g.fill(); g.restore();
+    g.fillStyle="#3c3c3c"; g.fillRect(15,56,8,5); g.fillRect(81,56,8,5);
+    g.fillStyle=vgrad(g,9,52, shade(st.frame,0.92), shade(st.frame,0.60));
+    rrG(g,7,9,90,50,5); g.fill();
+    g.fillStyle=vgrad(g,25,30, st.cool? "#f4fafd":"#fdf8ec", st.cool? "#d9e9f2":"#eee4cb");
+    rrG(g,11,25,82,29,3); g.fill();
+    g.fillStyle=vgrad(g,9,15, shade(st.frame,1.0), shade(st.frame,0.78));
+    rrG(g,7,9,90,15,5); g.fill();
+    g.fillStyle="rgba(255,255,255,.32)"; g.fillRect(7,9,90,2.5);
+    g.fillStyle="rgba(0,0,0,.22)"; g.fillRect(7,22.5,90,2);
+    g.fillStyle=vgrad(g,24,32, shade(st.frame,0.55), shade(st.frame,0.40));
+    g.fillRect(93,24,4,32);
+    g.fillStyle="rgba(0,0,0,.12)"; g.fillRect(11,25,82,3);
+    g.fillStyle="rgba(0,0,0,.15)"; g.fillRect(11,39,82,2);
+    g.fillStyle=shade(st.frame,0.85); g.fillRect(11,41,82,1.6);
+    if(st.cool){
+      g.fillStyle="rgba(120,220,255,.65)"; g.fillRect(7,9,90,3);
+      g.fillStyle="rgba(255,255,255,.30)";
+      g.beginPath(); g.moveTo(30,25); g.lineTo(46,54); g.lineTo(54,54); g.lineTo(38,25); g.closePath(); g.fill();
+    }
+  });
+}
+function kasseSprite(){
+  return sprite("kasse",88,76,(g)=>{
+    g.save(); g.fillStyle="rgba(0,0,0,.30)"; try{g.filter="blur(4px)";}catch(e){}
+    g.beginPath(); g.ellipse(44,63,38,7,0,0,7); g.fill(); g.restore();
+    g.fillStyle=vgrad(g,22,32,"#83959f","#5a6b76"); rrG(g,14,22,60,32,7); g.fill();
+    g.fillStyle="rgba(255,255,255,.26)"; g.fillRect(14,22,60,2.5);
+    g.fillStyle=vgrad(g,50,10,"#4c5a64","#39444d"); rrG(g,14,50,60,10,4); g.fill();
+    g.fillStyle=vgrad(g,27,21,"#454f58","#2b333a"); rrG(g,20,27,34,21,4); g.fill();
+    g.fillStyle="rgba(255,255,255,.12)"; g.fillRect(20,27,34,4);
+    g.fillStyle="#31404c"; rrG(g,58,26,13,15,3); g.fill();
+    g.fillStyle="#8fe3d0"; g.fillRect(60,28,9,5);
+    g.fillStyle="#c7cdd2"; g.fillRect(71.5,24,2.5,27);
+    g.fillStyle="#ff9d3f"; rrG(g,7,41,8,11,2); g.fill();
+    g.fillStyle="#ffc271"; rrG(g,7,41,8,4,2); g.fill();
+  });
+}
+function podSprite(){
+  return sprite("pod",56,60,(g)=>{
+    g.save(); g.fillStyle="rgba(0,0,0,.28)"; try{g.filter="blur(3px)";}catch(e){}
+    g.beginPath(); g.ellipse(28,50,22,5,0,0,7); g.fill(); g.restore();
+    g.fillStyle="#7d888e"; rrG(g,20,42,16,7,2); g.fill();
+    g.fillStyle=vgrad(g,17,26,"#4fa89f","#2e756e"); rrG(g,8,17,40,26,6); g.fill();
+    g.fillStyle="rgba(255,255,255,.22)"; g.fillRect(8,17,40,3);
+    g.fillStyle=vgrad(g,11,9,"#f2f5f7","#d8dee2"); rrG(g,8,11,40,9,3); g.fill();
+    g.fillStyle="#0f2a28"; rrG(g,15,22,26,15,3); g.fill();
+  });
+}
+function carSprite(col){
+  return sprite("car_"+col,56,44,(g)=>{
+    g.save(); g.fillStyle="rgba(0,0,0,.30)"; try{g.filter="blur(3px)";}catch(e){}
+    g.beginPath(); g.ellipse(28,34,22,5,0,0,7); g.fill(); g.restore();
+    g.fillStyle="#23262b";
+    g.beginPath(); g.arc(17,33,5,0,7); g.fill();
+    g.beginPath(); g.arc(39,33,5,0,7); g.fill();
+    g.fillStyle="#565b61";
+    g.beginPath(); g.arc(17,33,2,0,7); g.fill();
+    g.beginPath(); g.arc(39,33,2,0,7); g.fill();
+    g.fillStyle=col; rrG(g,10,8,36,25,8); g.fill();
+    g.fillStyle="rgba(255,255,255,.30)"; rrG(g,10,8,36,9,8); g.fill();
+    g.fillStyle="rgba(0,0,0,.14)"; g.fillRect(10,28,36,5);
+    g.fillStyle=vgrad(g,12,10,"#dff2fb","#9fc6da"); rrG(g,16,12,24,10,3); g.fill();
+    g.fillStyle="rgba(255,255,255,.5)"; g.fillRect(18,13,6,8);
+  });
 }
 
 function drawRoom(rect, wallCol, flA, flB, label){
@@ -1241,305 +1779,777 @@ function drawRoom(rect, wallCol, flA, flB, label){
 function render(){
   const now=performance.now()/1000;
   const dtv=Math.min(0.1, now-(VIS.last||now)); VIS.last=now;
+  initTex();
   ctx.setTransform(sc*devicePixelRatio,0,0,sc*devicePixelRatio,
                    -cam.x*sc*devicePixelRatio, -cam.y*sc*devicePixelRatio);
   ctx.textAlign="center";
-  const WW=LY.worldW, WH=LY.worldH;
-  // Wiese
-  ctx.fillStyle="#7fae70"; ctx.fillRect(cam.x-50,cam.y-50,stW/sc+100,stH/sc+100);
-  ctx.fillStyle="rgba(255,255,255,.06)";
-  for(let i=0;i<40;i++){
-    const gx=(i*97)%WW, gy=(i*61)%(LY.plazaTop-10);
-    ctx.fillRect(gx,gy,3,3);
+  const WW=LY.worldW, WH=LY.worldH, T=6;
+  const vwv=stW/sc, vhv=stH/sc;
+  DRLIST.length=0;
+
+  /* ===== Iso-Helfer ===== */
+  function isoWorld(fn,h){ ctx.save(); if(h) ctx.translate(0,-h); ctx.transform(IX,IY,-IX,IY,0,0); fn(); ctx.restore(); }
+  function faceS(x0,Y,w,h,fn){ const p=PJ(x0,Y,h); ctx.save(); ctx.transform(IX,IY,0,1,p.x,p.y); fn(w,h); ctx.restore(); }
+  function faceE(X0,y0,d,h,fn){ const p=PJ(X0,y0,h); ctx.save(); ctx.transform(-IX,IY,0,1,p.x,p.y); fn(d,h); ctx.restore(); }
+  function vg2(h,c1,c2){ const g=ctx.createLinearGradient(0,0,0,h); g.addColorStop(0,c1); g.addColorStop(1,c2); return g; }
+  function isoBox(x,y,w,d,h,cTop,cS,cE){
+    faceE(x+w,y,d,h,(W,H)=>{
+      if(typeof cE==="function"){ cE(W,H); return; }
+      const f = cE || (typeof cS==="string"? shade(cS,0.7) : "rgba(35,45,54,.85)");
+      ctx.fillStyle=f; ctx.fillRect(0,0,W,H);
+    });
+    faceS(x,y+d,w,h,(W,H)=>{ if(typeof cS==="function") cS(W,H); else { ctx.fillStyle=vg2(H,shade(cS,1.05),shade(cS,0.72)); ctx.fillRect(0,0,W,H);} 
+      ctx.fillStyle="rgba(0,0,0,.14)"; ctx.fillRect(0,h-2.5,W,2.5); });
+    isoWorld(()=>{ ctx.fillStyle= typeof cTop==="function"? cTop(): cTop; ctx.fillRect(x,y,w,d);
+      ctx.fillStyle="rgba(255,255,255,.16)"; ctx.fillRect(x,y,w,2); }, h);
   }
-  // Vorplatz
-  for(let ty=0; ty<(LY.roadY-LY.plazaTop)/30+1; ty++){
-    for(let tx=0; tx<WW/30+1; tx++){
-      ctx.fillStyle=(tx+ty)%2? "#cfcbc2" : "#c6c2b8";
-      ctx.fillRect(tx*30, LY.plazaTop+ty*30, 30, Math.min(30, LY.roadY-(LY.plazaTop+ty*30)));
+  function gshadow(x,y,w,d,al){ isoWorld(()=>{ ctx.fillStyle="rgba(0,0,0,"+(al||0.18)+")";
+    ctx.beginPath(); ctx.ellipse(x+w/2,y+d/2,w*0.62,d*0.72,0,0,7); ctx.fill(); }); }
+
+  const OUT="#4e5a63", WFACE= S.reno? "#95a9b6":"#8b969d";
+  function paintExt(W,H,winStep){
+    ctx.fillStyle=vg2(H, shade(WFACE,1.1), shade(WFACE,0.66)); ctx.fillRect(0,0,W,H);
+    ctx.fillStyle="rgba(255,255,255,.25)"; ctx.fillRect(0,0,W,2.5);
+    if(winStep){ for(let wx=12; wx<W-20; wx+=winStep){
+      ctx.fillStyle=vg2(H,"#d7ecf5","#8fb4c6"); ctx.fillRect(wx,H*0.28,17,H*0.42);
+      ctx.fillStyle="rgba(255,255,255,.5)"; ctx.fillRect(wx+3,H*0.3,4,H*0.38);
+      ctx.fillStyle="rgba(0,0,0,.18)"; ctx.fillRect(wx,H*0.28+H*0.42,17,2);
+    } }
+  }
+  function paintInt(W,H){
+    ctx.fillStyle=vg2(H, shade(WFACE,1.0), shade(WFACE,0.7)); ctx.fillRect(0,0,W,H);
+    ctx.fillStyle="rgba(255,255,255,.2)"; ctx.fillRect(0,0,W,2);
+  }
+  // Wand-Slab (horizontal: len entlang x / vertikal: len entlang y), mit Türlücken
+  function wallSlabH(x,y,len,gaps,style,winStep){
+    let segs=[[x,x+len]];
+    (gaps||[]).forEach(g=>{ const ns=[]; segs.forEach(([a1,a2])=>{
+      if(g[1]<=a1||g[0]>=a2){ns.push([a1,a2]);return;}
+      if(g[0]>a1) ns.push([a1,g[0]]); if(g[1]<a2) ns.push([g[1],a2]); }); segs=ns; });
+    segs.forEach(([a1,a2])=>{
+      D(a1*0.5+a2*0.5+y+T, ()=>{
+        isoBox(a1,y,a2-a1,T,WALLH, shade(OUT,1.1),
+          style==="ext"? (W,H)=>paintExt(W,H,winStep) : (W,H)=>paintInt(W,H), shade(OUT,0.8));
+      });
+    });
+    (gaps||[]).forEach(g=>{ isoWorld(()=>{ ctx.fillStyle="#8a6a3a"; ctx.fillRect(g[0]+2,y,g[1]-g[0]-4,T); }); });
+  }
+  function wallSlabV(x,y,len,gaps,style){
+    let segs=[[y,y+len]];
+    (gaps||[]).forEach(g=>{ const ns=[]; segs.forEach(([a1,a2])=>{
+      if(g[1]<=a1||g[0]>=a2){ns.push([a1,a2]);return;}
+      if(g[0]>a1) ns.push([a1,g[0]]); if(g[1]<a2) ns.push([g[1],a2]); }); segs=ns; });
+    segs.forEach(([a1,a2])=>{
+      D(x+T+(a1+a2)*0.5, ()=>{
+        faceE(x+T,a1,a2-a1,WALLH,(W,H)=>{ ctx.fillStyle=vg2(H, shade(WFACE,0.95), shade(WFACE,0.62)); ctx.fillRect(0,0,W,H); });
+        faceS(x,a2,T,WALLH,(W,H)=>{ ctx.fillStyle=shade(OUT,0.85); ctx.fillRect(0,0,W,H); });
+        isoWorld(()=>{ ctx.fillStyle=shade(OUT,1.1); ctx.fillRect(x,a1,T,a2-a1); }, WALLH);
+      });
+    });
+  }
+
+  /* ===== BODEN-PASS (Welt-Transform) ===== */
+  isoWorld(()=>{
+    ctx.fillStyle=TEX.grass; ctx.fillRect(-260,-260,WW+520,WH+520);
+    ctx.fillStyle=TEX.plaza; ctx.fillRect(0, LY.plazaTop, WW, LY.roadY-LY.plazaTop);
+    ctx.fillStyle="rgba(0,0,0,.06)"; ctx.fillRect(0,LY.plazaTop,WW,3);
+    ctx.fillStyle=TEX.asphalt; ctx.fillRect(-120,LY.roadY,WW+240,50);
+    ctx.fillStyle="rgba(0,0,0,.10)"; ctx.fillRect(-120,LY.roadY,WW+240,50);
+    ctx.fillStyle="#b8bcc2"; ctx.fillRect(-120,LY.roadY-4,WW+240,4);
+    ctx.strokeStyle="rgba(255,255,255,.7)"; ctx.lineWidth=2.5; ctx.setLineDash([14,12]);
+    ctx.beginPath(); ctx.moveTo(-120,LY.roadY+25); ctx.lineTo(WW+120,LY.roadY+25); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle="rgba(255,255,255,.85)";
+    for(let k=0;k<6;k++) ctx.fillRect(LY.door.x-30, LY.roadY+5+k*8, 60, 4);
+    ctx.fillStyle="#4a4f55"; ctx.beginPath(); ctx.arc(LY.door.x+120,LY.roadY+38,7,0,7); ctx.fill();
+    ctx.strokeStyle="rgba(0,0,0,.35)"; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.arc(LY.door.x+120,LY.roadY+38,7,0,7); ctx.stroke();
+    // Parkplatz
+    ctx.fillStyle=TEX.asphalt; ctx.fillRect(-120,LY.parkTop,WW+240,WH-LY.parkTop+120);
+    ctx.fillStyle="rgba(0,0,0,.05)"; ctx.fillRect(-120,LY.parkTop,WW+240,WH-LY.parkTop+120);
+    ctx.fillStyle="#b8bcc2"; ctx.fillRect(-120,LY.parkTop-4,WW+240,4);
+    for(let i=0;i<LY.spaces.length;i++){
+      const p=LY.spaces[i];
+      if(i<S.parking){ ctx.strokeStyle="rgba(255,255,255,.6)"; ctx.lineWidth=2; ctx.strokeRect(p.x-20,p.y-2,40,30); }
+      else{ ctx.setLineDash([4,5]); ctx.strokeStyle="rgba(255,255,255,.14)"; ctx.lineWidth=1.5;
+        ctx.strokeRect(p.x-20,p.y-2,40,30); ctx.setLineDash([]); }
+    }
+    // Gebäudeböden
+    const bodiesF=[{x:LY.gang.x,y:LY.srY,w:LY.gang.w,h:LY.gang.y+LY.gang.h-LY.srY}];
+    if(LY.back) bodiesF.push(LY.back);
+    bodiesF.push(LY.hall); if(LY.left) bodiesF.push(LY.left); if(LY.right) bodiesF.push(LY.right);
+    bodiesF.forEach(bd=>{ ctx.fillStyle=TEX.hall; ctx.fillRect(bd.x,bd.y,bd.w,bd.h); });
+    ctx.fillStyle=TEX.corr; ctx.fillRect(LY.gang.x,LY.gang.y,LY.gang.w,LY.gang.h);
+    ctx.fillStyle=TEX.corr; ctx.fillRect(LY.aisleX-30, LY.gang.y+LY.gang.h, 60, LY.hall.y-(LY.gang.y+LY.gang.h));
+    // Zonen-Teppiche
+    function rug(x,y,w,h,col){ ctx.fillStyle=col; ctx.fillRect(x,y,w,h); }
+    if(LY.left)  rug(LY.left.x+10, LY.left.y+16, LY.left.w-20, LY.left.h-26, "rgba(141,185,126,.30)");
+    if(LY.right) rug(LY.right.x+10, LY.right.y+16, LY.right.w-20, LY.right.h-26, "rgba(160,200,225,.30)");
+    if(LY.backL&&LY.back.hasBL) rug(LY.backL.x+10, LY.backL.y+16, LY.backL.w-20, LY.backL.h-26, "rgba(214,140,140,.24)");
+    if(LY.backR&&LY.back.hasBR) rug(LY.backR.x+10, LY.backR.y+16, LY.backR.w-20, LY.backR.h-26, "rgba(150,160,175,.24)");
+    {
+      const hs=LY.slots.filter(s=>s.zone==="hall");
+      if(hs.length){
+        const ys=hs.map(s=>s.y);
+        const y0=Math.min(...ys)-34, y1=Math.max(...ys)+26;
+        rug(LY.hall.x+34, y0, 116, y1-y0, "rgba(220,170,110,.22)");
+        rug(LY.hall.x+LY.hall.w-150, y0, 116, y1-y0, "rgba(220,170,110,.22)");
+      }
+      rug(LY.hall.x+14, LY.kassePos[0].y-96, LY.office.x-28-LY.hall.x, 160, "rgba(160,170,180,.16)");
+    }
+    ctx.fillStyle="rgba(255,255,255,.30)";
+    ctx.fillRect(LY.aisleX-30, LY.hall.y+4, 60, LY.hall.h-12);
+    if(S.office){ ctx.fillStyle="#dbe4f0"; ctx.fillRect(LY.office.x,LY.office.y,LY.office.w,LY.office.h);
+      ctx.fillStyle="rgba(70,95,150,.10)"; ctx.fillRect(LY.office.x,LY.office.y,LY.office.w,LY.office.h); }
+    // AO in Räumen
+    function aoRect(x,y,w,h){
+      let g=ctx.createLinearGradient(0,y,0,y+12);
+      g.addColorStop(0,"rgba(0,0,0,.13)"); g.addColorStop(1,"rgba(0,0,0,0)");
+      ctx.fillStyle=g; ctx.fillRect(x,y,w,12);
+      g=ctx.createLinearGradient(x,0,x+10,0);
+      g.addColorStop(0,"rgba(0,0,0,.10)"); g.addColorStop(1,"rgba(0,0,0,0)");
+      ctx.fillStyle=g; ctx.fillRect(x,y,10,h);
+    }
+    aoRect(LY.hall.x,LY.hall.y+T,LY.hall.w,LY.hall.h-T);
+    if(LY.left) aoRect(LY.left.x,LY.left.y+T,LY.left.w,LY.left.h-T);
+    if(LY.right) aoRect(LY.right.x,LY.right.y+T,LY.right.w,LY.right.h-T);
+    if(LY.backL&&LY.back.hasBL) aoRect(LY.backL.x,LY.backL.y+T,LY.backL.w,LY.backL.h-T);
+    if(LY.backR&&LY.back.hasBR) aoRect(LY.backR.x,LY.backR.y+T,LY.backR.w,LY.backR.h-T);
+    aoRect(LY.gang.x,LY.gang.y+T,LY.gang.w,LY.gang.h-T);
+    [LY.lager,LY.staffR,LY.ruhe,LY.tech].forEach(r=>aoRect(r.x,r.y+T,r.w,r.h-T));
+    // Sauberkeits-Balken Personalraum
+    const srr=LY.staffR;
+    ctx.fillStyle="rgba(0,0,0,.22)"; ctx.fillRect(srr.x+10,srr.y+srr.h-14,srr.w-20,5);
+    ctx.fillStyle= S.staffRoom>=30?"#1f8a4d":"#d33a2f";
+    ctx.fillRect(srr.x+10,srr.y+srr.h-14,(srr.w-20)*S.staffRoom/100,5);
+    // Dreck innen
+    dirt.forEach(dd=>{
+      ctx.fillStyle="rgba(120,95,60,.45)";
+      ctx.beginPath(); ctx.ellipse(dd.x,dd.y,dd.r,dd.r*.7,0,0,7); ctx.fill();
+      ctx.fillStyle="rgba(95,72,42,.55)";
+      ctx.beginPath(); ctx.ellipse(dd.x-1,dd.y,dd.r*.55,dd.r*.4,0,0,7); ctx.fill();
+    });
+  });
+
+  /* ===== WÄNDE (tiefensortiert) ===== */
+  const gx=LY.gang.x, gw=LY.gang.w, gy2=LY.gang.y+LY.gang.h;
+  wallSlabH(gx-T, LY.srY-T, gw+2*T, [], "ext", 0);
+  wallSlabV(gx-T, LY.srY-T, gy2-LY.srY+T, []);
+  wallSlabV(gx+gw, LY.srY-T, gy2-LY.srY+T, []);
+  [LY.lager,LY.staffR,LY.ruhe].forEach(r=>wallSlabV(r.x+r.w-T/2, LY.srY, LY.gang.y-LY.srY, []));
+  wallSlabH(gx, LY.gang.y-T/2, gw,
+    [[LY.lager.x+LY.lager.w/2-11,LY.lager.x+LY.lager.w/2+11],
+     [LY.staffR.x+LY.staffR.w/2-11,LY.staffR.x+LY.staffR.w/2+11],
+     [LY.ruhe.x+LY.ruhe.w/2-11,LY.ruhe.x+LY.ruhe.w/2+11],
+     [LY.tech.x+30,LY.tech.x+50]], "int");
+  // Gang-Südwand: aussen Fenster, innen Wand, Personal-Türe in der Mitte
+  wallSlabH(gx-T, gy2, LY.hall.x-(gx-T), [], "ext", 40);
+  wallSlabH(LY.hall.x, gy2, LY.hall.w, [[LY.aisleX-24,LY.aisleX+24]], "int");
+  wallSlabH(LY.hall.x+LY.hall.w, gy2, gx+gw+T-(LY.hall.x+LY.hall.w), [], "ext", 40);
+  if(LY.back){
+    wallSlabV(LY.hall.x-T, gy2, LY.back.h+T, []);
+    wallSlabV(LY.hall.x+LY.hall.w, gy2, LY.back.h+T, []);
+    wallSlabV(LY.aisleX-30-T/2, LY.back.y, LY.back.h, [[LY.back.corrY-20,LY.back.corrY+20]]);
+    wallSlabV(LY.aisleX+30-T/2, LY.back.y, LY.back.h, [[LY.back.corrY-20,LY.back.corrY+20]]);
+    wallSlabH(LY.hall.x, LY.hall.y-T/2, LY.hall.w, [[LY.aisleX-24,LY.aisleX+24]], "int");
+  }
+  // Hallen-Seitenwände (mit Flügeltüren)
+  const lGap = LY.left? [[LY.left.doorY-24,LY.left.doorY+24]] : [];
+  const rGap = LY.right? [[LY.right.doorY-24,LY.right.doorY+24]] : [];
+  wallSlabV(LY.hall.x-T, LY.hall.y, LY.hall.h-T, lGap);
+  wallSlabV(LY.hall.x+LY.hall.w, LY.hall.y, LY.hall.h-T, rGap);
+  if(LY.left){
+    wallSlabH(LY.left.x-T, LY.left.y-T, LY.left.w+T, [], "ext", 0);
+    wallSlabV(LY.left.x-T, LY.left.y-T, LY.left.h+2*T, []);
+    wallSlabH(LY.left.x-T, LY.left.y+LY.left.h, LY.left.w+T, [], "ext", 44);
+  }
+  if(LY.right){
+    wallSlabH(LY.right.x, LY.right.y-T, LY.right.w+T, [], "ext", 0);
+    wallSlabV(LY.right.x+LY.right.w, LY.right.y-T, LY.right.h+2*T, []);
+    wallSlabH(LY.right.x, LY.right.y+LY.right.h, LY.right.w+T, [], "ext", 44);
+  }
+  // Diebstahlbüro-Wände
+  if(S.office){
+    wallSlabH(LY.office.x, LY.office.y-T/2, LY.office.w, [], "int");
+    wallSlabV(LY.office.x-T/2, LY.office.y, LY.office.h, [[LY.office.y+46,LY.office.y+78]]);
+  }
+  /* ===== FASSADE (Hallen-Südwand, aussen) ===== */
+  {
+    const fx=LY.hall.x, fw=LY.hall.w, fyW=LY.hall.y+LY.hall.h, FH=WALLH+12;
+    D(fx+fw/2+fyW+T, ()=>{
+      faceE(fx+fw+T, fyW-T, T, FH, (W,H)=>{ ctx.fillStyle=shade(OUT,0.7); ctx.fillRect(0,0,W,H); });
+      faceS(fx-T, fyW+T, fw+2*T, FH, (W,H)=>{
+        const facade=S.reno? "#e8632a" : "#7d8a92";
+        ctx.fillStyle=vg2(H, shade(facade,1.08), shade(facade,0.7)); ctx.fillRect(0,0,W,H);
+        ctx.fillStyle="rgba(255,255,255,.22)"; ctx.fillRect(0,0,W,2.5);
+        // Schaufenster
+        const doorL=LY.door.x-42-(fx-T), doorR=LY.door.x+42-(fx-T);
+        ctx.fillStyle=vg2(H,"#d7ecf5","#9dbfd1");
+        ctx.fillRect(12,H*0.36,doorL-24,H*0.5);
+        ctx.fillRect(doorR+12,H*0.36,W-doorR-24,H*0.5);
+        ctx.fillStyle="rgba(255,255,255,.45)";
+        for(let sx2=20; sx2<W-20; sx2+=64){
+          if(sx2>doorL-24 && sx2<doorR+12) continue;
+          ctx.beginPath(); ctx.moveTo(sx2,H*0.86); ctx.lineTo(sx2+9,H*0.36); ctx.lineTo(sx2+14,H*0.36); ctx.lineTo(sx2+5,H*0.86); ctx.closePath(); ctx.fill();
+        }
+        // Türe (animiert)
+        const gap=6+3*Math.sin(now*2);
+        ctx.fillStyle=shade(facade,0.6); ctx.fillRect(doorL,H*0.3,doorR-doorL,H*0.7);
+        ctx.fillStyle="#cfe3ec";
+        ctx.fillRect(doorL+5,H*0.36,(doorR-doorL)/2-6-gap,H*0.6);
+        ctx.fillRect(LY.door.x-(fx-T)+2+gap,H*0.36,(doorR-doorL)/2-6-gap,H*0.6);
+        // Markise
+        for(let ax=8; ax<W-8; ax+=18){
+          if(ax>doorL-16 && ax<doorR) continue;
+          const w2=Math.min(18,W-8-ax);
+          const col=(Math.floor(ax/18)%2)? "#ff8a2a" : "#fdfdfb";
+          ctx.fillStyle=vg2(12,col,shade(col,0.78));
+          ctx.fillRect(ax,2,w2,9);
+          ctx.beginPath(); ctx.arc(ax+w2/2, 11, w2/2, 0, Math.PI); ctx.fill();
+        }
+        ctx.fillStyle="rgba(0,0,0,.18)"; ctx.fillRect(8,13,W-16,3);
+      });
+      isoWorld(()=>{ ctx.fillStyle=shade(OUT,1.1); ctx.fillRect(fx-T,fyW-T,fw+2*T,2*T); }, FH);
+      // Leuchtschild (Billboard)
+      const shopNm=("🛒 "+(S.shopName||LV().name)).toUpperCase();
+      const signW=Math.min(fw-30, shopNm.length*(S.reno?9.5:8.5)+34);
+      const sp=PJ(LY.door.x, fyW+T, FH+8);
+      ctx.fillStyle="rgba(0,0,0,.25)"; rr(sp.x-signW/2+3,sp.y-12,signW,26,8); ctx.fill();
+      ctx.fillStyle="#23303a"; rr(sp.x-signW/2,sp.y-15,signW,26,8); ctx.fill();
+      if(S.reno){ ctx.shadowColor="#ffb35c"; ctx.shadowBlur=10; }
+      ctx.fillStyle=S.reno? "#ffd23f" : "#ff9d3f";
+      ctx.font="800 "+(S.reno?14:12)+"px -apple-system,sans-serif";
+      ctx.fillText(shopNm, sp.x, sp.y+3);
+      ctx.shadowBlur=0;
+    });
+  }
+
+  /* ===== SCHILDER an den Wänden (Billboards) ===== */
+  function wallSign(x,y,txt,col){
+    LBB(x,y,()=>{
+      ctx.fillStyle="#fdfdfb"; rr(-txt.length*3.2-8,-WALLH-16,txt.length*6.4+16,13,4); ctx.fill();
+      ctx.strokeStyle="rgba(0,0,0,.15)"; ctx.lineWidth=1; rr(-txt.length*3.2-8,-WALLH-16,txt.length*6.4+16,13,4); ctx.stroke();
+      ctx.fillStyle=col||"#41505c"; ctx.font="800 8.5px -apple-system,sans-serif";
+      ctx.fillText(txt,0,-WALLH-6);
+    });
+  }
+  let lagerN=0; Object.keys(S.lager).forEach(k=>lagerN+=S.lager[k]);
+  const srOK=S.staffRoom>=30;
+  wallSign(LY.lager.x+LY.lager.w/2, LY.srY+4, "LAGER · "+lagerN);
+  wallSign(LY.staffR.x+LY.staffR.w/2, LY.srY+4, "PERSONALRAUM Lv."+S.staffRoomLvl+(srOK?"":" 🤢"));
+  if(S.staffRoomLvl>=4) wallSign(LY.ruhe.x+LY.ruhe.w/2, LY.srY+4, "RUHERAUM 💤","#5a4f7a");
+  wallSign(LY.tech.x+LY.tech.w/2, LY.srY+4, "TECHNIK");
+  if(LY.back&&LY.back.hasBL) wallSign(LY.backL.x+LY.backL.w/2, LY.back.y+4, "🥩 FLEISCH & FISCH","#a05656");
+  if(LY.back&&LY.back.hasBR) wallSign(LY.backR.x+LY.backR.w/2, LY.back.y+4, "🧺 NONFOOD");
+  if(LY.left) wallSign(LY.left.x+LY.left.w/2, LY.left.y+4, "🥦 GEMÜSE","#4d7a44");
+  if(LY.right) wallSign(LY.right.x+LY.right.w/2, LY.right.y+4, "🧀 KÄSE","#5f88a8");
+  if(S.office) wallSign(LY.office.x+LY.office.w/2, LY.office.y+4, "DIEBSTAHLBÜRO","#41507a");
+  LBB(LY.aisleX, LY.gang.y+LY.gang.h-2, ()=>{
+    ctx.fillStyle="#a83b2f"; rr(-36,-13,72,12,3); ctx.fill();
+    ctx.fillStyle="#fff"; ctx.font="800 7px -apple-system,sans-serif";
+    ctx.fillText("NUR PERSONAL",0,-4);
+  });
+  LBB(LY.aisleX, LY.back? LY.hall.y+44 : LY.hall.y+78, ()=>{
+    ctx.fillStyle="#23303a"; rr(-64,-12,128,20,6); ctx.fill();
+    ctx.fillStyle="#ffd23f"; ctx.font="800 10px -apple-system,sans-serif";
+    ctx.fillText("Willkommen! 👋",0,2);
+  });
+
+  /* ===== EINRICHTUNG (Iso-Möbel & Billboards) ===== */
+  // Lager-Regale
+  {
+    const r=LY.lager, nRk=Math.max(2, Math.floor((r.w-30)/48));
+    for(let k=0;k<nRk;k++){
+      const rx=r.x+16+k*48;
+      D(rx+r.y+50,()=>{ isoBox(rx,r.y+26,34,14,22,"#9a7a48","#8a6a3a");
+        [[9,-16],[25,-16],[25,-6],[9,-6]].forEach(([ox,oh],ii)=>{
+          const q=PJ(rx+ox,r.y+40,22+oh+8);
+          ctx.font="9px -apple-system,sans-serif"; ctx.fillText(ii%3===1?"🥫":"📦", q.x, q.y);
+        });
+      });
     }
   }
-  ctx.fillStyle="rgba(0,0,0,.06)"; ctx.fillRect(0,LY.plazaTop,WW,3);
-  // Strasse
-  ctx.fillStyle="#4a4f55"; ctx.fillRect(-60,LY.roadY,WW+120,50);
-  ctx.fillStyle="#b8bcc2"; ctx.fillRect(-60,LY.roadY-4,WW+120,4);
-  ctx.strokeStyle="rgba(255,255,255,.7)"; ctx.lineWidth=2.5; ctx.setLineDash([14,12]);
-  ctx.beginPath(); ctx.moveTo(-60,LY.roadY+25); ctx.lineTo(WW+60,LY.roadY+25); ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.font="11px -apple-system,sans-serif";
-  [[16,LY.plazaTop+12],[WW-16,LY.plazaTop+12]].forEach(([gx,gy])=>ctx.fillText("🌼",gx,gy));
+  // Personalraum
+  {
+    const r=LY.staffR;
+    D(r.x+30+r.y+40,()=>{
+      isoBox(r.x+12,r.y+22,42,12,14,"#d4d8dc","#c9cdd2");
+      const q=PJ(r.x+30,r.y+28,22); ctx.font="10px -apple-system,sans-serif"; ctx.fillText("☕",q.x,q.y);
+    });
+    D(r.x+32+r.y+56,()=>{ isoBox(r.x+22,r.y+48,22,14,11,"#9a7a48","#8a6a3a"); });
+    if(S.staffRoomLvl>=2) D(r.x+r.w-32+r.y+58,()=>{ isoBox(r.x+r.w-56,r.y+44,44,16,14,"#5d92c6","#4a7fb5"); });
+    if(S.staffRoomLvl>=3) D(r.x+r.w-30+r.y+30,()=>{
+      isoBox(r.x+r.w-50,r.y+20,36,6,18,"#20262d",(W,H)=>{ ctx.fillStyle="#1d232a"; ctx.fillRect(0,0,W,H);
+        ctx.fillStyle="#3a7fd4"; ctx.fillRect(2,3,W-4,H-7); });
+      const q=PJ(r.x+62,r.y+26,4); ctx.font="9px -apple-system,sans-serif"; ctx.fillText("🪴",q.x,q.y);
+    });
+  }
+  // Ruheraum
+  {
+    const r=LY.ruhe;
+    if(S.staffRoomLvl>=4){
+      const nB=r.w>120? 3:2;
+      for(let k=0;k<nB;k++){
+        const bx=r.x+14+k*((r.w-28-30)/(nB-1||1));
+        D(bx+15+r.y+56,()=>{
+          isoBox(bx,r.y+24,30,34,10,"#eef1f5","#e0e5ec");
+          isoWorld(()=>{ ctx.fillStyle="#6d86c4"; ctx.fillRect(bx+1,r.y+38,28,19);
+            ctx.fillStyle="#5a72ab"; ctx.fillRect(bx+1,r.y+38,28,4);
+            ctx.fillStyle="#fff"; ctx.fillRect(bx+4,r.y+27,22,8); },10);
+        });
+      }
+    }else{
+      isoWorld(()=>{ ctx.setLineDash([6,5]); ctx.strokeStyle="rgba(0,0,0,.22)"; ctx.lineWidth=2;
+        ctx.strokeRect(r.x+8,r.y+16,r.w-16,r.h-24); ctx.setLineDash([]); });
+      LBB(r.x+r.w/2,r.y+r.h/2,()=>{ ctx.fillStyle="rgba(0,0,0,.45)"; ctx.font="700 9px -apple-system,sans-serif"; ctx.fillText("🛏️ ab Stufe 4",0,0); });
+    }
+  }
+  // Technik
+  {
+    const r=LY.tech;
+    D(r.x+22+r.y+50,()=>{ isoBox(r.x+12,r.y+26,20,16,26,"#a7b1b8","#9aa5ad"); });
+    D(r.x+60+r.y+50,()=>{ isoBox(r.x+42,r.y+30,Math.max(20,r.w-64),12,10,"#78838b","#6f7a82"); });
+  }
+  // Diebstahlbüro-Einrichtung
+  if(S.office){
+    const r=LY.office;
+    D(r.x+38+r.y+46,()=>{
+      isoBox(r.x+14,r.y+32,50,16,14,"#9a7a48","#8a6a3a");
+      const q=PJ(r.x+30,r.y+38,22);
+      ctx.fillStyle="#2c3844"; ctx.fillRect(q.x-9,q.y-9,18,11);
+      ctx.fillStyle="#7ddfff"; ctx.fillRect(q.x-7,q.y-7,14,7);
+    });
+    D(r.x+r.w-22+r.y+40,()=>{ isoBox(r.x+r.w-32,r.y+24,20,12,26,"#a7b1bc","#9aa8bc"); });
+    D(r.x+30+r.y+70,()=>{ isoBox(r.x+12,r.y+r.h-32,42,9,9,"#68747d","#5f6b74"); });
+    BB(r.x+r.w-20,r.y+r.h-14,()=>{ ctx.font="10px -apple-system,sans-serif"; ctx.fillText("🚔",0,0); });
+  }else{
+    isoWorld(()=>{ ctx.fillStyle="rgba(0,0,0,.05)"; ctx.fillRect(LY.office.x,LY.office.y,LY.office.w,LY.office.h);
+      ctx.setLineDash([6,5]); ctx.strokeStyle="rgba(0,0,0,.22)"; ctx.lineWidth=2;
+      ctx.strokeRect(LY.office.x+4,LY.office.y+4,LY.office.w-8,LY.office.h-8); ctx.setLineDash([]); });
+    LBB(LY.office.x+LY.office.w/2, LY.office.y+LY.office.h/2, ()=>{
+      ctx.fillStyle="rgba(0,0,0,.45)"; ctx.font="700 9px -apple-system,sans-serif";
+      ctx.fillText("🚔 Büro kaufen",0,0); });
+  }
 
-  // Bushaltestelle
+  /* ===== AUSSEN-DEKO ===== */
+  [[10,0.30],[WW-10,0.22],[8,0.70],[WW-6,0.60]].forEach(([tx,fr])=>{
+    const ty=LY.srY+(LY.hall.y+LY.hall.h-LY.srY)*fr;
+    gshadow(tx-12,ty+4,24,12,0.22);
+    D(tx+ty+8,()=>{ const q=PJ(tx,ty,0);
+      ctx.fillStyle="#7a5230"; ctx.fillRect(q.x-2.5,q.y-16,5,16);
+      ctx.fillStyle="#4e7f42"; ctx.beginPath(); ctx.arc(q.x,q.y-22,14,0,7); ctx.fill();
+      ctx.fillStyle="#639a54"; ctx.beginPath(); ctx.arc(q.x-4,q.y-26,10,0,7); ctx.fill();
+      ctx.fillStyle="rgba(255,255,230,.25)"; ctx.beginPath(); ctx.arc(q.x-6,q.y-28,4.5,0,7); ctx.fill();
+    });
+  });
+  [[70],[WW-70]].forEach(([lx])=>{
+    gshadow(lx-6,LY.parkTop+16,12,8,0.25);
+    D(lx+LY.parkTop+30,()=>{ const q=PJ(lx,LY.parkTop+18,0);
+      ctx.fillStyle="#3a444c"; ctx.fillRect(q.x-2,q.y-38,4,38);
+      ctx.fillStyle="#ffd88a"; ctx.beginPath(); ctx.arc(q.x,q.y-40,4.5,0,7); ctx.fill(); });
+  });
+  LBB(64, LY.parkTop+14, ()=>{ ctx.fillStyle="rgba(255,255,255,.6)"; ctx.font="800 11px -apple-system,sans-serif";
+    ctx.fillText("🅿️ "+S.parking+" / "+LV().parkCap, 0, 0); });
+  // Parkuhr (mehrstufig)
+  {
+    const MX=LY.door.x+74, MY=LY.parkTop+16, mt=S.parkMeterTier;
+    if(mt>0){
+      gshadow(MX-8,MY+2,16,8,0.25);
+      D(MX+MY+8,()=>{
+        const q=PJ(MX,MY,0);
+        if(mt>=3){
+          isoBox(MX-10,MY-7,20,14,30,"#3a444c",(W,H)=>{
+            ctx.fillStyle=vg2? undefined:null; const g=ctx.createLinearGradient(0,0,0,H);
+            g.addColorStop(0,"#4fa89f"); g.addColorStop(1,"#2e756e");
+            ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+            ctx.fillStyle="#0f2a28"; ctx.fillRect(3,4,W-6,10);
+            ctx.fillStyle=`rgba(120,255,220,${0.5+0.3*Math.sin(performance.now()/300)})`;
+            ctx.fillRect(4,5,W-8,8);
+            ctx.fillStyle="#1d232a"; ctx.fillRect(4,17,W-8,2.5);
+          });
+          const q2=PJ(MX,MY-2,36);
+          ctx.fillStyle="#2a6fb0"; rr(q2.x-9,q2.y-9,18,14,3); ctx.fill();
+          ctx.fillStyle="#fff"; ctx.font="800 9px -apple-system,sans-serif"; ctx.fillText("P", q2.x, q2.y+2);
+        }else{
+          ctx.fillStyle="#5f6b74"; ctx.fillRect(q.x-2,q.y-30,4,30);
+          ctx.fillStyle= mt>=2? "#3a444c":"#7d888e";
+          rr(q.x-9,q.y-44,18,16,4); ctx.fill();
+          ctx.fillStyle="#2a6fb0"; rr(q.x-7,q.y-42,14,8,2); ctx.fill();
+          ctx.fillStyle="#fff"; ctx.font="800 7px -apple-system,sans-serif"; ctx.fillText("P", q.x, q.y-36);
+          if(mt>=2){
+            ctx.fillStyle="#23303a"; rr(q.x-8,q.y-52,16,7,2); ctx.fill();
+            ctx.fillStyle="#3a6a99"; rr(q.x-7,q.y-51,14,5,1); ctx.fill();
+            ctx.fillStyle=`rgba(120,255,180,${0.5+0.3*Math.sin(performance.now()/280)})`;
+            ctx.fillRect(q.x-6,q.y-33,12,2.5);
+          }
+        }
+      });
+    }
+  }
+  {
+    const cx0=LY.door.x-120, cy0=LY.parkTop+16;
+    D(cx0+cy0+10,()=>{
+      isoBox(cx0-28,cy0-8,56,16,20,"#4fa89f",(W,H)=>{ ctx.fillStyle=vg2(H,"#4fa89f","#2e756e"); ctx.fillRect(0,0,W,H); });
+      const q=PJ(cx0,cy0,4);
+      ctx.font="11px -apple-system,sans-serif"; ctx.fillText("🛒", q.x-7, q.y); ctx.fillText("🛒", q.x+7, q.y);
+    });
+  }
+  // Bushaltestelle & Werbetafel
   if(S.busstop){
     const b=LY.busStop;
-    ctx.fillStyle="rgba(0,0,0,.14)";
-    ctx.beginPath(); ctx.ellipse(b.x,b.y+16,44,8,0,0,7); ctx.fill();
-    ctx.fillStyle="#5f6b74"; ctx.fillRect(b.x-38,b.y-26,4,40); ctx.fillRect(b.x+34,b.y-26,4,40);
-    box3(b.x-44,b.y-34,88,10,6,"#ff9d3f",4);
-    ctx.fillStyle="rgba(190,220,235,.55)"; ctx.fillRect(b.x-36,b.y-22,72,26);
-    ctx.fillStyle="#8a6a3a"; rr(b.x-28,b.y+2,56,7,3); ctx.fill();
-    ctx.fillStyle="#5f6b74"; ctx.fillRect(b.x+52,b.y-34,3,50);
-    ctx.fillStyle="#ffd23f"; rr(b.x+44,b.y-46,20,16,3); ctx.fill();
-    ctx.font="10px -apple-system,sans-serif";
-    ctx.fillText("🚌", b.x+54, b.y-34);
+    D(b.x+b.y+10,()=>{
+      isoBox(b.x-40,b.y-14,80,20,26,"#ffb35c",(W,H)=>{ ctx.fillStyle="rgba(190,220,235,.6)"; ctx.fillRect(0,0,W,H);
+        ctx.fillStyle=vg2(6,"#ff9d3f","#e07f20"); ctx.fillRect(0,0,W,6); });
+      const q=PJ(b.x+50,b.y,30);
+      ctx.fillStyle="#ffd23f"; rr(q.x-10,q.y-8,20,16,3); ctx.fill();
+      ctx.font="10px -apple-system,sans-serif"; ctx.fillText("🚌", q.x, q.y+4);
+    });
   }
-  // Werbetafel
   if(S.billboard){
     const bb=LY.billboard;
-    ctx.fillStyle="rgba(0,0,0,.14)";
-    ctx.beginPath(); ctx.ellipse(bb.x,bb.y+30,40,7,0,0,7); ctx.fill();
-    ctx.fillStyle="#5f6b74";
-    ctx.fillRect(bb.x-26,bb.y+2,5,28); ctx.fillRect(bb.x+21,bb.y+2,5,28);
-    box3(bb.x-40,bb.y-32,80,38,6,"#23303a",6);
-    ctx.fillStyle="#fff"; rr(bb.x-35,bb.y-27,70,28,4); ctx.fill();
-    ctx.fillStyle="#ff7a00"; ctx.font="800 10px -apple-system,sans-serif";
-    ctx.fillText((S.shopName||LV().name).toUpperCase().slice(0,14), bb.x, bb.y-14);
-    ctx.fillStyle="#23303a"; ctx.font="700 8.5px -apple-system,sans-serif";
-    const promoTxt = (S.promoId && isPromo(S.promoId)) ? "AKTION: "+P[S.promoId].emoji+" "+P[S.promoId].name : "Heute frisch! "+SEASON_EMOJI[season()];
-    ctx.fillText(promoTxt.slice(0,22), bb.x, bb.y-4);
-    for(let k=0;k<6;k++){
-      const on=Math.floor(now*3+k)%2===0;
-      ctx.fillStyle=on? "#ffd23f":"#6b7076";
-      ctx.beginPath(); ctx.arc(bb.x-30+k*12, bb.y-31, 2.2, 0, 7); ctx.fill();
-    }
+    D(bb.x+bb.y+12,()=>{
+      const q=PJ(bb.x,bb.y+6,0);
+      ctx.fillStyle="#5f6b74"; ctx.fillRect(q.x-24,q.y-30,5,30); ctx.fillRect(q.x+19,q.y-30,5,30);
+      ctx.fillStyle="#23303a"; rr(q.x-42,q.y-70,84,42,6); ctx.fill();
+      ctx.fillStyle=vg2? "#fff":"#fff";
+      const bgr2=ctx.createLinearGradient(0,q.y-65,0,q.y-33);
+      bgr2.addColorStop(0,"#ffffff"); bgr2.addColorStop(1,"#dfe6ea");
+      ctx.fillStyle=bgr2; rr(q.x-37,q.y-65,74,32,4); ctx.fill();
+      ctx.fillStyle="#ff7a00"; ctx.font="800 10px -apple-system,sans-serif";
+      ctx.fillText((S.shopName||LV().name).toUpperCase().slice(0,14), q.x, q.y-52);
+      ctx.fillStyle="#23303a"; ctx.font="700 8.5px -apple-system,sans-serif";
+      const promoTxt=(S.promoId && isPromo(S.promoId))? "AKTION: "+P[S.promoId].emoji+" "+P[S.promoId].name : "Heute frisch! "+SEASON_EMOJI[season()];
+      ctx.fillText(promoTxt.slice(0,22), q.x, q.y-40);
+      for(let k=0;k<6;k++){
+        const on=Math.floor(now*3+k)%2===0;
+        ctx.fillStyle=on? "#ffd23f":"#6b7076";
+        ctx.beginPath(); ctx.arc(q.x-32+k*13, q.y-68, 2.2, 0, 7); ctx.fill();
+      }
+    });
   }
-  // Abfall
-  ctx.font="13px -apple-system,sans-serif";
-  odirt.forEach(d=>{
-    ctx.fillStyle="rgba(0,0,0,.10)";
-    ctx.beginPath(); ctx.ellipse(d.x,d.y+4,7,3,0,0,7); ctx.fill();
-    ctx.fillText(d.em, d.x, d.y+4);
+  odirt.forEach(dd=>{
+    gshadow(dd.x-7,dd.y,14,7,0.12);
+    BB(dd.x,dd.y,()=>{ ctx.font="13px -apple-system,sans-serif"; ctx.fillText(dd.em,0,2); });
   });
   // Bus
   if(BUS.active){
-    const bx=BUS.x, by=LY.roadY+5;
-    ctx.fillStyle="rgba(0,0,0,.2)";
-    ctx.beginPath(); ctx.ellipse(bx+42,by+30,44,6,0,0,7); ctx.fill();
-    ctx.fillStyle="#e8e5de"; rr(bx,by,84,30,6); ctx.fill();
-    ctx.fillStyle="#ff7a00"; rr(bx,by,84,12,6); ctx.fill();
-    ctx.fillStyle="#bfe0ee";
-    for(let k=0;k<3;k++){ rr(bx+8+k*22,by+4,16,10,2); ctx.fill(); }
-    if(BUS.state==="stop"){ ctx.fillStyle="#39444d"; rr(bx+64,by+10,14,18,2); ctx.fill(); }
-    ctx.fillStyle="#23303a"; ctx.font="800 7px -apple-system,sans-serif";
-    ctx.fillText("AARAU", bx+42, by+24);
-    ctx.fillStyle="#23303a";
-    ctx.beginPath(); ctx.arc(bx+16,by+30,5,0,7); ctx.fill();
-    ctx.beginPath(); ctx.arc(bx+68,by+30,5,0,7); ctx.fill();
+    const bx=BUS.x, by=LY.roadY+8;
+    D(bx+42+by+40,()=>{
+      gshadow(bx,by-2,84,26,0.25);
+      isoBox(bx,by-4,84,22,22,"#f0ede6",(W,H)=>{
+        ctx.fillStyle=vg2(H,"#f2efe8","#d8d4ca"); ctx.fillRect(0,0,W,H);
+        ctx.fillStyle=vg2(8,"#ff8a2a","#e06d10"); ctx.fillRect(0,0,W,8);
+        ctx.fillStyle="#bfe0ee"; for(let k=0;k<3;k++) ctx.fillRect(8+k*24,9,18,8);
+        ctx.fillStyle="#23303a"; ctx.font="800 7px -apple-system,sans-serif"; ctx.fillText("AARAU", W/2, H-3);
+        ctx.fillStyle="#23262b";
+        ctx.beginPath(); ctx.arc(16,H+3,5,0,7); ctx.fill();
+        ctx.beginPath(); ctx.arc(W-16,H+3,5,0,7); ctx.fill();
+      });
+    });
   }
+  // Autos (Iso-Klötze)
+  const nightNow=(dayHour()>=19.5||dayHour()<7);
+  cars.forEach(car=>{
+    const cyl=car.y+2;
+    gshadow(car.x-18,cyl+2,36,22,0.25);
+    D(car.x+cyl+22,()=>{
+      if(nightNow && car.state!=="parked"){
+        const q=PJ(car.x+34,cyl+12,4);
+        ctx.fillStyle="rgba(255,240,170,.35)";
+        ctx.beginPath(); ctx.ellipse(q.x+10,q.y,24,8,0,0,7); ctx.fill();
+      }
+      isoBox(car.x-17,cyl+2,34,20,11,"rgba(255,255,255,.001)",(W,H)=>{
+        ctx.fillStyle=vg2(H, car.col, shade(car.col,0.7)); ctx.fillRect(0,0,W,H);
+        ctx.fillStyle="#23262b"; 
+        ctx.beginPath(); ctx.arc(8,H+1,4.5,0,7); ctx.fill();
+        ctx.beginPath(); ctx.arc(W-8,H+1,4.5,0,7); ctx.fill();
+      },(W,H)=>{ ctx.fillStyle=shade(car.col,0.62); ctx.fillRect(0,0,W,H); });
+      isoWorld(()=>{ ctx.fillStyle=car.col; ctx.fillRect(car.x-17,cyl+2,34,20);
+        ctx.fillStyle="rgba(255,255,255,.28)"; ctx.fillRect(car.x-17,cyl+2,34,7); },11);
+      isoBox(car.x-10,cyl+5,20,14,7,"rgba(220,240,250,.001)",(W,H)=>{
+        ctx.fillStyle=vg2(H,"#dff2fb","#9fc6da"); ctx.fillRect(0,0,W,H); });
+      isoWorld(()=>{ ctx.fillStyle=shade(car.col,0.92); ctx.fillRect(car.x-10,cyl+5,20,14); },18);
+    });
+  });
 
-  /* ---- Gebäude: Räume ---- */
-  const wallCol = S.reno? "#93a8b5" : "#9aa5aa";
-  const flA = S.reno? "#efe9da" : "#e9e3d3";
-  const flB = S.reno? "#e6dfcc" : "#e2dbc8";
-  if(LY.back) drawRoom(LY.back, wallCol, flA, flB, (LY.back.hasBL?"🥩 Fleisch":"")+(LY.back.hasBL&&LY.back.hasBR?"   ·   ":"")+(LY.back.hasBR?"🧺 NonFood":""));
-  if(LY.left) drawRoom(LY.left, wallCol, flA, flB, "🥦 Gemüse");
-  if(LY.right) drawRoom(LY.right, wallCol, flA, flB, "🧀 Käse");
-  drawRoom(LY.hall, wallCol, flA, flB, null);
-  // Durchgänge freischneiden
-  ctx.fillStyle=flA;
-  if(LY.left)  ctx.fillRect(LY.hall.x-9, LY.left.doorY-24, 18, 48);
-  if(LY.right) ctx.fillRect(LY.hall.x+LY.hall.w-9, LY.right.doorY-24, 18, 48);
-  if(LY.back)  ctx.fillRect(LY.aisleX-30, LY.hall.y-9, 60, 18);
-  // Mittelgang
-  ctx.fillStyle="rgba(255,255,255,.25)";
-  ctx.fillRect(LY.aisleX-30, LY.hall.y+8, 60, LY.hall.h-16);
-  // Rückwand-Deko in der Halle
-  ctx.fillStyle="#23303a"; rr(LY.aisleX-64,LY.hall.y+64,128,20,6); ctx.fill();
-  ctx.fillStyle="#ffd23f"; ctx.font="800 10px -apple-system,sans-serif";
-  ctx.fillText("Willkommen! 👋", LY.aisleX, LY.hall.y+78);
-
-  /* ---- Lager & Personalraum ---- */
-  box3(LY.lager.x,LY.lager.y,LY.lager.w,LY.lager.h,8,"#d8cfb8",10);
-  ctx.strokeStyle="#b8ab8a"; ctx.lineWidth=1.5;
-  rr(LY.lager.x,LY.lager.y,LY.lager.w,LY.lager.h,10); ctx.stroke();
-  let lagerN=0; Object.keys(S.lager).forEach(k=>lagerN+=S.lager[k]);
-  ctx.font="12px -apple-system,sans-serif";
-  ctx.fillText("📦", LY.lager.x+18, LY.lager.y+30);
-  ctx.fillStyle="#6b5f42"; ctx.font="700 11px -apple-system,sans-serif";
-  ctx.fillText("Lager · "+lagerN+" Stk.", LY.lager.x+LY.lager.w/2+8, LY.lager.y+29);
-  const srOK=S.staffRoom>=30;
-  box3(LY.staffR.x,LY.staffR.y,LY.staffR.w,LY.staffR.h,8, srOK?"#d3dde6":"#e2c9c5",10);
-  ctx.strokeStyle= srOK?"#a8b6c2":"#c09088"; ctx.lineWidth=1.5;
-  rr(LY.staffR.x,LY.staffR.y,LY.staffR.w,LY.staffR.h,10); ctx.stroke();
-  ctx.font="11px -apple-system,sans-serif";
-  ctx.fillText(srOK?"☕":"🥴", LY.staffR.x+18, LY.staffR.y+30);
-  ctx.fillStyle="#41505c"; ctx.font="700 10.5px -apple-system,sans-serif"; ctx.textAlign="left";
-  ctx.fillText("Personalraum"+(srOK?"":" 🤢"), LY.staffR.x+34, LY.staffR.y+21);
-  ctx.fillStyle="#95a6b2"; ctx.fillRect(LY.staffR.x+34, LY.staffR.y+29, LY.staffR.w-48, 6);
-  ctx.fillStyle= srOK?"#1f8a4d":"#d33a2f";
-  ctx.fillRect(LY.staffR.x+34, LY.staffR.y+29, (LY.staffR.w-48)*S.staffRoom/100, 6);
-  ctx.textAlign="center";
-
-  /* ---- Regale ---- */
-  const act=activeSlots();
+  /* ===== REGALE (Iso-Gondeln) ===== */
   LY.slots.forEach(s=>{
     if(s.zone==="hall" && parseInt(s.id.slice(1))>=S.hallShelves){
-      ctx.setLineDash([5,4]); ctx.strokeStyle="rgba(0,0,0,.16)"; ctx.lineWidth=1.5;
-      rr(s.x-45,s.y-18,90,36,8); ctx.stroke(); ctx.setLineDash([]);
+      isoWorld(()=>{ ctx.setLineDash([5,4]); ctx.strokeStyle="rgba(0,0,0,.18)"; ctx.lineWidth=1.5;
+        ctx.strokeRect(s.x-45,s.y-16,90,28); ctx.setLineDash([]); });
       return;
     }
     if(s.zone!=="hall" && !S.depts.includes(s.zone)) return;
     const d=shelfData(s.id);
-    const st=DEPT_STYLE[s.zone==="hall"? (d.prod?P[d.prod].dept:"food") : s.zone]||DEPT_STYLE.food;
-    box3(s.x-45,s.y-18,90,36,9,st.frame,8);
-    ctx.fillStyle=st.inner; rr(s.x-41,s.y-14,82,24,6); ctx.fill();
-    if(st.cool){
-      ctx.strokeStyle="rgba(255,255,255,.8)"; ctx.lineWidth=2;
-      rr(s.x-41,s.y-14,82,24,6); ctx.stroke();
-      ctx.fillStyle="rgba(190,225,245,.35)"; rr(s.x-41,s.y-14,82,10,6); ctx.fill();
-      ctx.fillStyle="#5f88a8"; ctx.font="8px -apple-system,sans-serif";
-      ctx.fillText("❄", s.x+36, s.y-6);
-    }
-    if(d.prod){
-      const p=P[d.prod];
-      const show=Math.min(6, Math.ceil(d.units/(shelfCap()/6)));
-      ctx.font="12px -apple-system,sans-serif";
-      for(let k=0;k<show;k++){
-        const col=k%3, row=Math.floor(k/3);
-        ctx.fillText(p.emoji, s.x-24+col*24, s.y-2+row*11);
+    const firstProd=(d.parts.find(pt=>pt.prod)||{}).prod;
+    const st=DEPT_STYLE[s.zone==="hall"? (firstProd?P[firstProd].dept:"food") : s.zone]||DEPT_STYLE.food;
+    const X=s.x-45, Y=s.y-16, Wd=90, Dp=26, Hh=32;
+    gshadow(X,Y+4,Wd,Dp,0.22);
+    D(s.x+s.y+12, ()=>{
+      faceE(X+Wd,Y,Dp,Hh,(W,H)=>{ ctx.fillStyle=vg2(H, shade(st.frame,0.72), shade(st.frame,0.5)); ctx.fillRect(0,0,W,H); });
+      faceS(X,Y+Dp,Wd,Hh,(W,H)=>{
+        ctx.fillStyle=vg2(H, shade(st.frame,0.95), shade(st.frame,0.66)); ctx.fillRect(0,0,W,H);
+        ctx.fillStyle= st.cool? "#eef6fa" : "#f8f1de"; ctx.fillRect(4,3,W-8,H-8);
+        ctx.fillStyle="rgba(0,0,0,.13)"; ctx.fillRect(4,H*0.48,W-8,2);
+        if(st.cool){ ctx.fillStyle="rgba(120,220,255,.5)"; ctx.fillRect(0,0,W,3);
+          ctx.fillStyle="rgba(255,255,255,.3)";
+          ctx.beginPath(); ctx.moveTo(W*0.3,3); ctx.lineTo(W*0.42,H-5); ctx.lineTo(W*0.48,H-5); ctx.lineTo(W*0.36,3); ctx.closePath(); ctx.fill(); }
+        const nP=d.parts.length;
+        for(let k=1;k<nP;k++){ ctx.fillStyle=shade(st.frame,0.75); ctx.fillRect(4+(W-8)*k/nP-1,3,2.5,H-8); }
+      });
+      isoWorld(()=>{ ctx.fillStyle=shade(st.frame,1.02); ctx.fillRect(X,Y,Wd,Dp);
+        ctx.fillStyle="rgba(255,255,255,.2)"; ctx.fillRect(X,Y,Wd,3); },Hh);
+      // Produkte: Billboards auf zwei Ebenen entlang der Front
+      const parts=d.parts, nP=parts.length;
+      const anyProd=parts.some(pt=>pt.prod);
+      if(anyProd){
+        const secW=90/nP;
+        parts.forEach((pt,k)=>{
+          const x0=X+k*secW;
+          const cxm=x0+secW/2;
+          if(!pt.prod){
+            const q=PJ(cxm,Y+Dp,Hh/2);
+            ctx.fillStyle="rgba(0,0,0,.3)"; ctx.font="800 10px -apple-system,sans-serif"; ctx.fillText("+",q.x,q.y);
+            return;
+          }
+          const p=P[pt.prod];
+          const perR=nP===1? 4 : nP===2? 2 : 1;
+          const fill=pt.units/shelfCap();
+          const icons=Math.min(perR*2, Math.ceil(fill*perR*2));
+          ctx.font=(nP===1?"11px":"10px")+" -apple-system,sans-serif";
+          for(let ic=0;ic<icons;ic++){
+            const col=ic%perR, row=Math.floor(ic/perR);
+            const px2=x0+secW/2+(col-(perR-1)/2)*(secW/(perR+0.3));
+            const q=PJ(px2, Y+Dp, Hh-9-row*13);
+            ctx.fillText(p.emoji, q.x, q.y);
+          }
+          // Preisschild-Billboard
+          const q2=PJ(cxm, Y+Dp, 0);
+          const liq=isLiq(pt.prod), promo=isPromo(pt.prod);
+          ctx.fillStyle="#fff"; rr(q2.x-13,q2.y+2,26,10,3); ctx.fill();
+          ctx.strokeStyle="rgba(0,0,0,.15)"; ctx.lineWidth=1; rr(q2.x-13,q2.y+2,26,10,3); ctx.stroke();
+          ctx.fillStyle= pt.units===0?"#d33a2f": pt.units<shelfCap()*0.3?"#e8a13a":"#1f8a4d";
+          ctx.beginPath(); ctx.arc(q2.x-9,q2.y+7,2,0,7); ctx.fill();
+          ctx.fillStyle= liq? "#e07800" : promo? "#b40000" : "#c22a20";
+          ctx.font="800 7px -apple-system,sans-serif";
+          ctx.fillText(vkEff(pt.prod).toFixed(2), q2.x+3, q2.y+9.5);
+          if(p.season===season() && k===0){
+            const q3=PJ(X+8,Y+4,Hh+6);
+            ctx.font="9px -apple-system,sans-serif"; ctx.fillText(SEASON_EMOJI[season()], q3.x, q3.y);
+          }
+        });
+        const anyPromo=parts.some(pt=>pt.prod&&isPromo(pt.prod));
+        const anyLiq=parts.some(pt=>pt.prod&&isLiq(pt.prod));
+        if(anyPromo||anyLiq){
+          LBLIST.push(()=>{
+            const q=PJ(s.x,Y+2,Hh+16);
+            ctx.fillStyle= Math.sin(now*7)>0? "#ffd23f":"#ff7a00";
+            rr(q.x-30,q.y-7,60,13,4); ctx.fill();
+            ctx.fillStyle="#7a2c00"; ctx.font="800 8px -apple-system,sans-serif";
+            ctx.fillText(anyLiq? "🏷️ −"+Math.round(S.liqPct*100)+"%" : "🔥 2× AKTION", q.x, q.y+3);
+          });
+        }
+        if(parts.every(pt=>!pt.prod||pt.units===0) && Math.sin(now*6)>0){
+          LBLIST.push(()=>{
+            const q=PJ(s.x,Y+2,Hh+14);
+            ctx.fillStyle="#d33a2f"; ctx.font="800 10px -apple-system,sans-serif";
+            ctx.fillText("LEER!", q.x, q.y);
+          });
+        }
+      }else{
+        const q=PJ(s.x,Y+Dp,Hh/2);
+        ctx.fillStyle="rgba(0,0,0,.45)"; ctx.font="700 9.5px -apple-system,sans-serif";
+        ctx.fillText("Produkt wählen", q.x, q.y);
       }
-      if(show===0){ ctx.fillStyle="rgba(0,0,0,.25)"; ctx.font="700 9px -apple-system,sans-serif"; ctx.fillText("· leer ·", s.x, s.y+1); }
-      ctx.fillStyle="rgba(0,0,0,.25)"; ctx.fillRect(s.x-41,s.y+12,82,4);
-      ctx.fillStyle= d.units===0?"#d33a2f": d.units<shelfCap()*0.3?"#e8a13a":"#1f8a4d";
-      ctx.fillRect(s.x-41,s.y+12,82*d.units/shelfCap(),4);
-      const tagX=s.side==="R"? s.x-51 : s.x+51;
-      ctx.fillStyle="#fff"; rr(tagX-14,s.y-8,28,15,3); ctx.fill();
-      ctx.strokeStyle="rgba(0,0,0,.15)"; ctx.lineWidth=1; rr(tagX-14,s.y-8,28,15,3); ctx.stroke();
-      const promo=isPromo(d.prod);
-      ctx.fillStyle= promo? "#b40000" : "#d33a2f"; ctx.font="800 8.5px -apple-system,sans-serif";
-      ctx.fillText(vkOf(d.prod).toFixed(2), tagX, s.y+3);
-      if(promo){
-        ctx.fillStyle= Math.sin(now*7)>0? "#ffd23f":"#ff7a00";
-        rr(s.x-26,s.y-31,52,13,4); ctx.fill();
-        ctx.fillStyle="#7a2c00"; ctx.font="800 8px -apple-system,sans-serif";
-        ctx.fillText("🔥 2× AKTION", s.x, s.y-21);
-      }
-      if(d.units===0 && Math.sin(now*6)>0){
-        ctx.fillStyle="#d33a2f"; ctx.font="800 10px -apple-system,sans-serif";
-        ctx.fillText("LEER!", s.x, s.y-23);
-      }
-      if(p.season===season()){
-        ctx.font="9px -apple-system,sans-serif";
-        ctx.fillText(SEASON_EMOJI[season()], s.x-38, s.y-8);
-      }
-    }else{
-      ctx.fillStyle="rgba(0,0,0,.4)"; ctx.font="700 10px -apple-system,sans-serif";
-      ctx.fillText("Produkt wählen", s.x, s.y+3);
-    }
+    });
   });
 
-  /* ---- Kassen & Self-Scans ---- */
+  /* ===== KASSEN & SELF-SCANS ===== */
   for(let i=0;i<LY.kassePos.length;i++){
     const p=LY.kassePos[i];
     if(i>=S.kassen){
-      ctx.setLineDash([5,4]); ctx.strokeStyle="rgba(0,0,0,.16)"; ctx.lineWidth=1.5;
-      rr(p.x-30,p.y-16,60,32,8); ctx.stroke(); ctx.setLineDash([]);
+      isoWorld(()=>{ ctx.setLineDash([5,4]); ctx.strokeStyle="rgba(0,0,0,.18)"; ctx.lineWidth=1.5;
+        ctx.strokeRect(p.x-30,p.y-13,60,26); ctx.setLineDash([]); });
       continue;
     }
-    box3(p.x-30,p.y-16,60,32,9,"#6e7f8c",8);
-    ctx.fillStyle="#39444d"; rr(p.x-24,p.y-10,34,20,4); ctx.fill();
-    ctx.strokeStyle="rgba(255,255,255,.25)"; ctx.lineWidth=1.5;
-    const off=(now*18)%8;
-    for(let k=0;k<5;k++){
-      const lx=p.x-22+((k*8+off)%34);
-      ctx.beginPath(); ctx.moveTo(lx,p.y-8); ctx.lineTo(lx,p.y+8); ctx.stroke();
-    }
-    ctx.font="13px -apple-system,sans-serif"; ctx.fillText("🖨️", p.x+19, p.y+1);
-    ctx.fillStyle="#fff"; ctx.font="800 8px -apple-system,sans-serif";
-    ctx.fillText("KASSE "+(i+1), p.x, p.y-21);
-    const q=queues.kasse[i];
-    if(q.length && !q[0].path.length && staffOn("kassierer")===0){
-      const pulse=0.6+0.4*Math.sin(now*5);
-      ctx.fillStyle=`rgba(255,122,0,${pulse})`;
-      ctx.font="800 11px -apple-system,sans-serif";
-      ctx.fillText("👆 TIPPEN!", p.x, p.y-32);
-    }
+    gshadow(p.x-30,p.y-10,60,24,0.22);
+    D(p.x+p.y+14,()=>{
+      isoBox(p.x-30,p.y-13,60,26,22,"#7e909d",(W,H)=>{
+        ctx.fillStyle=vg2(H,"#83959f","#57666f"); ctx.fillRect(0,0,W,H);
+        ctx.fillStyle="rgba(255,255,255,.2)"; ctx.fillRect(0,0,W,2.5); });
+      // Laufband auf dem Deckel
+      isoWorld(()=>{
+        ctx.fillStyle="#2f373e"; ctx.fillRect(p.x-25,p.y-9,36,18);
+        ctx.strokeStyle="rgba(255,255,255,.25)"; ctx.lineWidth=1.5;
+        const off=(now*18)%8;
+        for(let k=0;k<5;k++){
+          const lx=p.x-23+((k*8+off)%34);
+          ctx.beginPath(); ctx.moveTo(lx,p.y-8); ctx.lineTo(lx,p.y+8); ctx.stroke();
+        }
+        ctx.fillStyle="#31404c"; ctx.fillRect(p.x+14,p.y-10,13,12);
+        ctx.fillStyle="#8fe3d0"; ctx.fillRect(p.x+16,p.y-8,9,5);
+      },22);
+      // Nummern-Pfosten
+      const q=PJ(p.x+24,p.y-10,22);
+      ctx.fillStyle="#5f6b74"; ctx.fillRect(q.x-1.2,q.y-22,2.5,22);
+      ctx.fillStyle="#ffd23f"; ctx.beginPath(); ctx.arc(q.x,q.y-26,7.5,0,7); ctx.fill();
+      ctx.fillStyle="#23303a"; ctx.font="800 9px -apple-system,sans-serif";
+      ctx.fillText(""+(i+1), q.x, q.y-23);
+      const qq=queues.kasse[i];
+      if(qq.length && !qq[0].path.length && staffOn("kassierer")===0){
+        LBLIST.push(()=>{
+          const pulse=0.6+0.4*Math.sin(now*5);
+          const q2=PJ(p.x-6,p.y-14,22);
+          ctx.fillStyle=`rgba(255,122,0,${pulse})`;
+          ctx.font="800 11px -apple-system,sans-serif";
+          ctx.fillText("👆 TIPPEN!", q2.x, q2.y-26);
+        });
+      }
+    });
   }
-  // Self-Scan-Zone: Schild + Pod-Gitter
   if(S.selfscans>0 && LY.scanPods.length){
-    const topPod=LY.scanPods[Math.min(S.selfscans,LY.scanPods.length)-1];
-    ctx.fillStyle="#3f9089";
-    rr(LY.scanAnchor.x-52, topPod.y-34, 104, 16, 5); ctx.fill();
-    ctx.fillStyle="#fff"; ctx.font="800 8.5px -apple-system,sans-serif";
-    ctx.fillText("SELF-SCAN", LY.scanAnchor.x, topPod.y-23);
+    const act2=LY.scanPods.slice(0,S.selfscans);
+    const topY=Math.min(...act2.map(p=>p.y));
+    let cx2=(Math.min(...act2.map(p=>p.x))+Math.max(...act2.map(p=>p.x)))/2;
+    cx2=Math.min(cx2, LY.office.x-70);
+    LBB(cx2, topY-6, ()=>{
+      ctx.fillStyle="rgba(0,0,0,.18)"; rr(-50,-46,104,17,6); ctx.fill();
+      ctx.fillStyle="#3f9089"; rr(-52,-49,104,17,6); ctx.fill();
+      ctx.fillStyle="#fff"; ctx.font="800 8.5px -apple-system,sans-serif";
+      ctx.fillText("SELF-SCAN", 0, -37);
+    });
   }
   for(let i=0;i<LY.scanPods.length;i++){
     const p=LY.scanPods[i];
     if(i>=S.selfscans){
-      ctx.setLineDash([4,4]); ctx.strokeStyle="rgba(0,0,0,.13)"; ctx.lineWidth=1.5;
-      rr(p.x-20,p.y-13,40,26,6); ctx.stroke(); ctx.setLineDash([]);
+      isoWorld(()=>{ ctx.setLineDash([4,4]); ctx.strokeStyle="rgba(0,0,0,.15)"; ctx.lineWidth=1.5;
+        ctx.strokeRect(p.x-16,p.y-10,32,20); ctx.setLineDash([]); });
       continue;
     }
-    box3(p.x-20,p.y-13,40,26,7,"#3f9089",6);
-    ctx.fillStyle="#0f2a28"; rr(p.x-13,p.y-9,26,14,3); ctx.fill();
-    const busy=!!p.busy;
-    ctx.fillStyle= busy? `rgba(255,210,90,${0.6+0.3*Math.sin(now*6+i)})` : `rgba(120,255,220,${0.45+0.25*Math.sin(now*3+i)})`;
-    rr(p.x-10,p.y-6,20,8,2); ctx.fill();
-  }
-
-  /* ---- Dreck innen ---- */
-  dirt.forEach(d=>{
-    ctx.fillStyle="rgba(120,95,60,.45)";
-    ctx.beginPath(); ctx.ellipse(d.x,d.y,d.r,d.r*.7,0,0,7); ctx.fill();
-    ctx.fillStyle="rgba(95,72,42,.55)";
-    ctx.beginPath(); ctx.ellipse(d.x-1,d.y,d.r*.55,d.r*.4,0,0,7); ctx.fill();
-  });
-
-  /* ---- Fassade ---- */
-  const fy=LY.hall.y+LY.hall.h-6;
-  const facade=S.reno? "#e8632a" : "#7d8a92";
-  ctx.fillStyle=facade; rr(LY.hall.x,fy,LY.hall.w,26,6); ctx.fill();
-  ctx.fillStyle="rgba(190,220,240,.85)";
-  rr(LY.hall.x+14,fy+5,LY.door.x-44-(LY.hall.x+14),16,3); ctx.fill();
-  rr(LY.door.x+44,fy+5,LY.hall.x+LY.hall.w-14-(LY.door.x+44),16,3); ctx.fill();
-  const gap=6+3*Math.sin(now*2);
-  ctx.fillStyle=shade(facade,0.7); rr(LY.door.x-42,fy+2,84,22,4); ctx.fill();
-  ctx.fillStyle="#cfe3ec";
-  ctx.fillRect(LY.door.x-38,fy+5,36-gap,16);
-  ctx.fillRect(LY.door.x+2+gap,fy+5,36-gap,16);
-  ctx.fillStyle="#5a4632"; ctx.fillRect(LY.door.x-30,fy+26,60,6);
-  const shopNm=("🛒 "+(S.shopName||LV().name)).toUpperCase();
-  const signW=Math.min(LY.hall.w-30, shopNm.length*(S.reno?9.5:8.5)+34);
-  ctx.fillStyle="rgba(0,0,0,.2)"; rr(LY.door.x-signW/2+3,fy-15,signW,26,8); ctx.fill();
-  ctx.fillStyle="#23303a"; rr(LY.door.x-signW/2,fy-18,signW,26,8); ctx.fill();
-  if(S.reno){ ctx.shadowColor="#ffb35c"; ctx.shadowBlur=10; }
-  ctx.fillStyle=S.reno? "#ffd23f" : "#ff9d3f";
-  ctx.font="800 "+(S.reno?14:12)+"px -apple-system,sans-serif";
-  ctx.fillText(shopNm, LY.door.x, fy+1);
-  ctx.shadowBlur=0;
-  if(S.reno){
-    [[LY.door.x-72,fy+34],[LY.door.x+72,fy+34]].forEach(([px,py])=>{
-      ctx.fillStyle="#a9552f"; rr(px-13,py-3,26,9,3); ctx.fill();
-      ctx.font="12px -apple-system,sans-serif"; ctx.fillText("🌷", px, py-2);
+    gshadow(p.x-16,p.y-7,32,18,0.2);
+    D(p.x+p.y+10,()=>{
+      isoBox(p.x-16,p.y-10,32,20,26,"#eef2f4",(W,H)=>{
+        ctx.fillStyle=vg2(H,"#4fa89f","#2e756e"); ctx.fillRect(0,0,W,H);
+        ctx.fillStyle="#0f2a28"; ctx.fillRect(5,4,W-10,12);
+        const busy=!!p.busy;
+        ctx.fillStyle= busy? `rgba(255,210,90,${0.6+0.3*Math.sin(now*6+i)})` : `rgba(120,255,220,${0.45+0.25*Math.sin(now*3+i)})`;
+        ctx.fillRect(7,6,W-14,8);
+      });
     });
   }
+  // Schranken & Kameras
+  if(S.gateTier>0){
+    [[LY.door.x-30],[LY.door.x+30]].forEach(([gx2])=>{
+      const gy3=LY.hall.y+LY.hall.h-34;
+      D(gx2+gy3+6,()=>{ isoBox(gx2-4,gy3-4,8,8,20,"#98a5ae","#8a97a0");
+        const q=PJ(gx2,gy3,24);
+        ctx.fillStyle= (S.gateTier>1 && Math.sin(now*4)>0)? "#7dffb0" : "#4a5a64";
+        ctx.beginPath(); ctx.arc(q.x,q.y,2.5,0,7); ctx.fill(); });
+    });
+  }
+  if(S.camTier>0){
+    const cams=[[LY.office.x-20,LY.office.y+4],[LY.hall.x+18,LY.hall.y+8],[LY.aisleX,LY.hall.y+LY.hall.h-14]];
+    for(let k=0;k<Math.min(S.camTier,3);k++){
+      BB(cams[k][0],cams[k][1],()=>{ ctx.font="12px -apple-system,sans-serif"; ctx.fillText("📹",0,-WALLH+6); });
+    }
+  }
 
-  /* ---- Personal & Kunden ---- */
+  /* ===== PERSONEN & EFFEKTE ===== */
+  if(staffOn("sicherheit")>0 && GUARD.init){
+    drawPerson(GUARD.x,GUARD.y,"#2f3b46","#c98a5b","#1e1e1e",
+      {hat:"#2f3b46",vest:"#ffd23f",phase: GUARD.state!=="post"? now*10 : undefined});
+    BB(GUARD.x,GUARD.y,()=>{ ctx.font="9px -apple-system,sans-serif";
+      ctx.fillText(GUARD.state==="chase"?"❗":"👀",0,-30); });
+  }
   drawStaff(now,dtv);
   customers.forEach(c=>{
     drawPerson(c.x,c.y, c.thief?"#d33a2f":c.shirt, c.skin, c.hair,
       {phase: c.path.length? now*9+(c.po||0) : undefined});
-    if(c.carry.length){ ctx.font="11px -apple-system,sans-serif"; ctx.fillText("🧺", c.x+11, c.y+2); }
-    if(c.angry){ ctx.font="10px -apple-system,sans-serif"; ctx.fillText("💢", c.x+8, c.y-20); }
-    if(c.state==="scanning" && c.scanT){
-      const w=26, pr=Math.min(1,c.scanT/3.5);
-      ctx.fillStyle="rgba(0,0,0,.3)"; rr(c.x-w/2,c.y-27,w,5,2.5); ctx.fill();
-      ctx.fillStyle="#7dffdc"; rr(c.x-w/2,c.y-27,w*pr,5,2.5); ctx.fill();
+    if(c.carry.length){
+      BB(c.x,c.y,()=>{ ctx.font="10px -apple-system,sans-serif";
+        ctx.fillText(P[c.carry[c.carry.length-1].prod].emoji, 10, -2); });
+    }
+    if(c.state==="scanning" && c.pod!=null){
+      const w2=26, pr=Math.min(1,c.scanT/scanTime());
+      BB(c.x,c.y,()=>{
+        ctx.fillStyle="rgba(0,0,0,.3)"; ctx.fillRect(-w2/2,-32,w2,5);
+        ctx.fillStyle="#7dffb0"; ctx.fillRect(-w2/2,-32,w2*pr,5);
+      });
+    }
+    if(c.state==="queue" && c.wait>14){
+      BB(c.x,c.y,()=>{ ctx.font="10px -apple-system,sans-serif"; ctx.fillText("💢",8,-20); });
+    }
+    if(c.angry){ BB(c.x,c.y,()=>{ ctx.font="10px -apple-system,sans-serif"; ctx.fillText("💢",8,-20); }); }
+    if(c.thief){
+      BB(c.x,c.y,()=>{
+        ctx.strokeStyle=`rgba(255,60,40,${0.5+0.4*Math.sin(now*8)})`; ctx.lineWidth=2.5;
+        ctx.beginPath(); ctx.arc(0,-6,17,0,7); ctx.stroke();
+        ctx.font="10px -apple-system,sans-serif"; ctx.fillText("💨",-14,-16);
+      });
     }
   });
-  effects.forEach(e=>{
-    ctx.globalAlpha=Math.min(1,e.t);
-    ctx.fillStyle=e.col; ctx.font="800 12px -apple-system,sans-serif";
-    ctx.fillText(e.txt, e.x, e.y);
-    ctx.globalAlpha=1;
-  });
-  /* ---- Abendstimmung ---- */
-  const prog=S.t/dayLen();
-  if(prog>0.72){
-    const a=(prog-0.72);
-    ctx.fillStyle=`rgba(255,140,50,${a*0.4})`; ctx.fillRect(cam.x-50,cam.y-50,stW/sc+100,stH/sc+100);
-    ctx.fillStyle=`rgba(30,30,70,${a*0.4})`; ctx.fillRect(cam.x-50,cam.y-50,stW/sc+100,stH/sc+100);
+  for(let i=effects.length-1;i>=0;i--){
+    const e=effects[i];
+    e.t-=dtv; e.y-=dtv*18;
+    if(e.t<=0){ effects.splice(i,1); continue; }
+    LBB(e.x,e.y,()=>{
+      ctx.globalAlpha=Math.min(1,e.t*2);
+      ctx.fillStyle=e.col||"#1f8a4d"; ctx.font="800 12px -apple-system,sans-serif";
+      ctx.fillText(e.txt,0,0);
+      ctx.globalAlpha=1;
+    });
   }
+
+  /* ===== TIEFENSORTIERT ZEICHNEN ===== */
+  DRLIST.sort((a,b)=>a.z-b.z);
+  DRLIST.forEach(d=>d.fn());
+  DRLIST.length=0;
+
+  /* ===== LICHT & NACHT ===== */
+  {
+    const vgd=ctx.createRadialGradient(cam.x+vwv*0.35, cam.y+vhv*0.25, 60,
+                                      cam.x+vwv*0.5, cam.y+vhv*0.55, Math.max(vwv,vhv)*0.85);
+    vgd.addColorStop(0,"rgba(255,250,225,.07)");
+    vgd.addColorStop(0.6,"rgba(0,0,0,0)");
+    vgd.addColorStop(1,"rgba(25,35,55,.13)");
+    ctx.fillStyle=vgd; ctx.fillRect(cam.x-60,cam.y-60,vwv+120,vhv+120);
+  }
+  const hNow=dayHour();
+  let dusk=0, dark=0;
+  if(hNow>=19 && hNow<20) dusk=(hNow-19);
+  if(hNow>=20) dark=Math.min(1,(hNow-20)/1.2);
+  if(hNow<7) dark=Math.min(1,(7-hNow)/1.5);
+  if(dusk>0){ ctx.fillStyle=`rgba(255,140,60,${dusk*0.22})`; ctx.fillRect(cam.x-60,cam.y-60,vwv+120,vhv+120); }
+  if(dark>0){
+    isoWorld(()=>{
+      const bbX=LY.gang.x-10, bbX2=LY.gang.x+LY.gang.w+10;
+      const bbY=LY.srY-10, bbY2=LY.hall.y+LY.hall.h+14;
+      ctx.fillStyle=`rgba(10,14,42,${dark*0.55})`;
+      ctx.fillRect(-260,-260,WW+520,bbY+260);
+      ctx.fillRect(-260,bbY,bbX+260,bbY2-bbY);
+      ctx.fillRect(bbX2,bbY,WW+260-bbX2,bbY2-bbY);
+      ctx.fillRect(-260,bbY2,WW+520,WH+260-bbY2);
+    });
+    function glow(wx,wy,r,col){
+      const q=PJ(wx,wy,0);
+      const g=ctx.createRadialGradient(q.x,q.y,4,q.x,q.y,r);
+      g.addColorStop(0,col); g.addColorStop(1,"rgba(255,220,140,0)");
+      ctx.fillStyle=g; ctx.fillRect(q.x-r,q.y-r,r*2,r*2);
+    }
+    glow(LY.door.x, LY.hall.y+LY.hall.h+30, 70, `rgba(255,220,140,${dark*0.5})`);
+    [[LY.hall.x+50],[LY.door.x],[LY.hall.x+LY.hall.w-50]].forEach(([lx])=>{
+      const ly=LY.plazaTop+66;
+      const q=PJ(lx,ly,0);
+      ctx.fillStyle="#3a444c"; ctx.fillRect(q.x-2,q.y-34,4,34);
+      ctx.fillStyle="#ffd88a"; ctx.beginPath(); ctx.arc(q.x,q.y-36,4,0,7); ctx.fill();
+      glow(lx,ly,55,`rgba(255,215,130,${dark*0.4})`);
+    });
+    if(S.billboard) glow(LY.billboard.x, LY.billboard.y, 60, `rgba(255,200,120,${dark*0.45})`);
+    if(S.busstop) glow(LY.busStop.x, LY.busStop.y, 46, `rgba(200,225,255,${dark*0.4})`);
+  }
+  /* ===== LABEL-EBENE (immer zuoberst, nichts verschmilzt) ===== */
+  LBLIST.forEach(f=>f());
+  LBLIST.length=0;
 }
 
 /* ================= EINGABE (Wischen + Tippen) ================= */
@@ -1566,10 +2576,27 @@ window.addEventListener("pointerup", ev=>{
   PTR.down=false;
   if(PTR.dragged) return;
   const r=cv.getBoundingClientRect();
-  const x=(ev.clientX-r.left)/sc+cam.x, y=(ev.clientY-r.top)/sc+cam.y;
-  handleTap(x,y);
+  const w=UNPJ((ev.clientX-r.left)/sc+cam.x, (ev.clientY-r.top)/sc+cam.y);
+  handleTap(w.x, w.y);
 });
 function handleTap(x,y){
+  // Diebe fangen – überall, solange sie sichtbar sind!
+  for(const c of customers){
+    if(c.thief && Math.hypot(x-c.x, y-c.y)<28){
+      catchThief(c,"player");
+      return;
+    }
+  }
+  // Parkplatz: Parkuhr & Ausbau
+  if(y>LY.parkTop-6){
+    if(Math.hypot(x-(LY.door.x+74), y-(LY.parkTop+16))<26){
+      if(S.parkMeterTier>0) toast(`🪙 Parkuhr Stufe ${S.parkMeterTier}: ${fmt(METER_FEE[S.parkMeterTier])} pro Auto. Heute: +${fmt(S.dayLog.pfees)}`);
+      else{ openPanel("ausbau"); toast("🪙 Eine Parkuhr kannst du im Ausbau kaufen!"); }
+      return;
+    }
+    if(S.parking<LV().parkCap){ openPanel("ausbau"); toast("🅿️ Mehr Parkplätze gibt's im Ausbau!"); }
+    return;
+  }
   // Aussen
   if(y>LY.plazaTop-6){
     for(let i=odirt.length-1;i>=0;i--){
@@ -1614,8 +2641,20 @@ function handleTap(x,y){
   }
   const lg=LY.lager;
   if(x>lg.x && x<lg.x+lg.w && y>lg.y && y<lg.y+lg.h){ openPanel("einkauf"); return; }
+  const ru=LY.ruhe;
+  if(x>ru.x && x<ru.x+ru.w && y>ru.y && y<ru.y+ru.h){
+    if(S.staffRoomLvl>=4) toast("💤 Ruheraum: Dein Team ist top erholt (+24% Tempo).");
+    else{ openPanel("ausbau"); toast("🛏️ Der Ruheraum kommt mit Personalraum-Stufe 4."); }
+    return;
+  }
+  const of=LY.office;
+  if(x>of.x && x<of.x+of.w && y>of.y && y<of.y+of.h){
+    if(S.office) toast("🚔 Diebstahlbüro: Jede Anzeige bringt CHF 100.");
+    else{ openPanel("ausbau"); toast("🚔 Das Diebstahlbüro kannst du im Ausbau kaufen."); }
+    return;
+  }
   for(const s of activeSlots()){
-    if(Math.abs(x-s.x)<50 && Math.abs(y-s.y)<24){ openShelf(s.id); return; }
+    if(Math.abs(x-s.x)<50 && y>s.y-32 && y<s.y+26){ openShelf(s.id); return; }
   }
 }
 
@@ -1833,7 +2872,9 @@ window.dropProduct=function(id){
   delete S.priceAdj[id];
   if(S.promoId===id) S.promoId=null;
   Object.keys(S.shelves).forEach(k=>{
-    if(S.shelves[k].prod===id){ S.shelves[k].prod=null; S.shelves[k].units=0; }
+    (S.shelves[k].parts||[]).forEach(pt=>{
+      if(pt.prod===id){ pt.prod=null; pt.units=0; }
+    });
   });
   toast(`🗑️ ${P[id].name} aus dem Sortiment geworfen`);
   renderPanel(); save();
@@ -1953,6 +2994,44 @@ function renderAusbau(){
       ${owned?'<span class="tag hit">✓ gebaut</span>':`<button class="btn" onclick="buyDept('${k}')">${fmtS(cost(d.cost))}</button>`}
     </div>`;
   });
+  html+="<div class='secTitle'>Upgrades (mehrstufig)</div>";
+  html+=`<div class="row"><div class="em">🅿️</div>
+    <div class="info"><b>Parkplätze <span class="tag">${S.parking}/${L.parkCap}</span></b>
+    <small>2/3 der Kundschaft kommt mit dem Auto – ohne freien Platz fahren sie weiter!</small></div>
+    <button class="btn" onclick="buyParking()" ${S.parking>=L.parkCap?"disabled":""}>+2 · ${fmtS(cost(30+S.parking*3))}</button></div>`;
+  html+=`<div class="row"><div class="em">🪙</div>
+    <div class="info"><b>Parkuhr <span class="tag">Stufe ${S.parkMeterTier}/3</span></b>
+    <small>${S.parkMeterTier>0? "Jedes parkierende Auto zahlt "+fmt(METER_FEE[S.parkMeterTier])+"." : "Kassiere Parkgebühren von jedem Auto!"}${S.parkMeterTier<3? " Nächste Stufe: "+fmt(METER_FEE[S.parkMeterTier+1])+" pro Auto." : ""}</small></div>
+    ${S.parkMeterTier>=3?'<span class="tag hit">✓ max</span>':`<button class="btn" onclick="buyTier('parkMeterTier',3,[120,300,600],0)">${fmtS(cost([120,300,600][S.parkMeterTier]))}</button>`}</div>`;
+  html+=`<div class="row"><div class="em">🗄️</div>
+    <div class="info"><b>Regal-System <span class="tag">Stufe ${S.shelfTier}/3</span></b>
+    <small>Jedes Regal fasst ${S.shelfTier} Produkt${S.shelfTier>1?"e":""} gleichzeitig${S.shelfTier<3?" – nächste Stufe: "+(S.shelfTier+1):""}.</small></div>
+    ${S.shelfTier>=3?'<span class="tag hit">✓ max</span>':`<button class="btn" onclick="buyTier('shelfTier',3,[600,1500])">${fmtS(cost([600,1500][S.shelfTier-1]))}</button>`}</div>`;
+  html+=`<div class="row"><div class="em">🧾</div>
+    <div class="info"><b>Kassen-Tempo <span class="tag">Stufe ${S.kasseTier}/3</span></b>
+    <small>Kassierer/innen arbeiten schneller (${[2.6,2.0,1.5][S.kasseTier-1]}s pro Kunde).</small></div>
+    ${S.kasseTier>=3?'<span class="tag hit">✓ max</span>':`<button class="btn" onclick="buyTier('kasseTier',3,[400,1000])">${fmtS(cost([400,1000][S.kasseTier-1]))}</button>`}</div>`;
+  html+=`<div class="row"><div class="em">🖥️</div>
+    <div class="info"><b>Self-Scan-Tempo <span class="tag">Stufe ${S.scanTier}/3</span></b>
+    <small>Scannen dauert nur noch ${scanTime()}s.</small></div>
+    ${S.scanTier>=3?'<span class="tag hit">✓ max</span>':`<button class="btn" onclick="buyTier('scanTier',3,[350,900])">${fmtS(cost([350,900][S.scanTier-1]))}</button>`}</div>`;
+  html+=`<div class="row"><div class="em">📹</div>
+    <div class="info"><b>Überwachungskameras <span class="tag">Stufe ${S.camTier}/3</span></b>
+    <small>−3% Diebstahl pro Stufe. Aktuelles Risiko: ${Math.round(theftChance()*100)}%.</small></div>
+    ${S.camTier>=3?'<span class="tag hit">✓ max</span>':`<button class="btn" onclick="buyTier('camTier',3,[250,500,800],0)">${fmtS(cost([250,500,800][S.camTier]))}</button>`}</div>`;
+  html+=`<div class="row"><div class="em">🚧</div>
+    <div class="info"><b>Ausgangs-Schranken <span class="tag">Stufe ${S.gateTier}/2</span></b>
+    <small>−2% Diebstahl pro Stufe und Diebe fliehen 13% langsamer.</small></div>
+    ${S.gateTier>=2?'<span class="tag hit">✓ max</span>':`<button class="btn" onclick="buyTier('gateTier',2,[300,700],0)">${fmtS(cost([300,700][S.gateTier]))}</button>`}</div>`;
+  html+=`<div class="row"><div class="em">🚔</div>
+    <div class="info"><b>Diebstahlbüro</b>
+    <small>Der Wachmann bringt gefasste Diebe hierher: Anzeige = CHF 100 Busse. Auch selbst gefasste Diebe zahlen die Busse!</small></div>
+    ${S.office?'<span class="tag hit">✓ gebaut</span>':`<button class="btn" onclick="buyOffice()">${fmtS(cost(450))}</button>`}</div>`;
+  const SRN=["","Kaffee-Ecke","+ Sofa","+ TV & Pflanzen","+ Ruheraum mit Betten"];
+  html+=`<div class="row"><div class="em">🛋️</div>
+    <div class="info"><b>Personalraum <span class="tag">Stufe ${S.staffRoomLvl}/4</span></b>
+    <small>${SRN[S.staffRoomLvl]}. +8% Arbeitstempo pro Stufe, verschmutzt langsamer.${S.staffRoomLvl<4?" Nächste Stufe: "+SRN[S.staffRoomLvl+1]+".":""}</small></div>
+    ${S.staffRoomLvl>=4?'<span class="tag hit">✓ max</span>':`<button class="btn" onclick="buyTier('staffRoomLvl',4,[200,450,900])">${fmtS(cost([200,450,900][S.staffRoomLvl-1]))}</button>`}</div>`;
   html+="<div class='secTitle'>Aussenbereich & Extras</div>";
   html+=`<div class="row"><div class="em">📣</div>
     <div class="info"><b>Werbetafel</b><small>+35% Kundschaft. Laufende Kosten: ${fmtS(20)}/Tag.</small></div>
@@ -1987,6 +3066,32 @@ window.buyDept=function(k){
   toast(`${DEPTS[k].emoji} Abteilung ${DEPTS[k].name} angebaut – dein Laden ist gewachsen! 🏗️`, true);
   renderPanel(); save();
 };
+window.buyTier=function(key,max,prices,zeroBase){
+  const cur=S[key];
+  const idx=(zeroBase===0)? cur : cur-1;
+  if(cur>=max) return;
+  if(!pay(cost(prices[idx]))) return;
+  S[key]=cur+1;
+  const names={shelfTier:"Regal-System",kasseTier:"Kassen-Tempo",scanTier:"Self-Scan-Tempo",camTier:"Kameras",gateTier:"Schranken",staffRoomLvl:"Personalraum",parkMeterTier:"Parkuhr"};
+  toast(`⬆️ ${names[key]||key}: Stufe ${S[key]}!`);
+  if(key==="shelfTier") toast("🗄️ Alle Regale haben jetzt Platz für ein weiteres Produkt!", true);
+  renderPanel(); save();
+};
+window.buyParking=function(){
+  const L=LV();
+  if(S.parking>=L.parkCap) return;
+  if(!pay(cost(30+S.parking*3))) return;
+  S.parking=Math.min(L.parkCap, S.parking+2);
+  toast("🅿️ 2 neue Parkplätze markiert!");
+  renderPanel(); save();
+};
+window.buyOffice=function(){
+  if(S.office) return;
+  if(!pay(cost(450))) return;
+  S.office=true;
+  toast("🚔 Diebstahlbüro eröffnet – Anzeigen bringen CHF 100!", true);
+  renderPanel(); save();
+};
 window.buyBillboard=function(){ if(!S.billboard && pay(cost(150))){ S.billboard=true; toast("📣 Werbetafel steht – die Leute reden über dich!"); renderPanel(); save(); } };
 window.buyBusstop=function(){ if(!S.busstop && pay(cost(400))){ S.busstop=true; R.bus=8; toast("🚌 Bushaltestelle gebaut – der erste Bus kommt gleich!"); renderPanel(); save(); } };
 window.buyReno=function(){ if(!S.reno && pay(cost(500))){ S.reno=true; toast("✨ Frisch renoviert – dein Laden glänzt!"); renderPanel(); save(); } };
@@ -1996,54 +3101,57 @@ function openShelf(id){
   const slot=slotById(id);
   const d=shelfData(id);
   const zoneName = slot.zone==="hall" ? "Halle" : DEPTS[slot.zone].emoji+" "+DEPTS[slot.zone].name;
-  let html=`<h2>🗄️ Regal (${zoneName})</h2>`;
-  if(d.prod){
-    const p=P[d.prod];
-    const lag=S.lager[d.prod]||0;
-    html+=`<div class="sub">${p.emoji} ${p.name} · ${d.units}/${shelfCap()} im Regal · ${lag} im Lager</div>
-    <button class="btn green" onclick="refill('${id}')" ${lag<=0||d.units>=shelfCap()?"disabled":""}>📦 Auffüllen (aus dem Lager)</button>
-    <button class="btn sec" style="width:100%;margin-top:8px" onclick="clearShelf('${id}')">Produkt wechseln</button>`;
-    if(lag<=0) html+=`<p style="font-size:12px;color:var(--ink-soft);margin-top:10px">Kein Lagerbestand – bestelle Nachschub unter «Einkauf».</p>`;
-  }else{
-    html+=`<div class="sub">Welches Produkt soll hier verkauft werden?</div>`;
-    const taken=new Set(Object.values(S.shelves).map(x=>x.prod).filter(Boolean));
-    const options=S.assortment.filter(pid=>{
-      if(taken.has(pid)) return false;
-      if(slot.zone==="hall") return S.depts.includes(P[pid].dept);
-      return P[pid].dept===slot.zone;
-    });
-    if(options.length){
-      options.forEach(pid=>{
-        const p=P[pid];
-        html+=`<div class="row"><div class="em">${p.emoji}</div>
-        <div class="info"><b>${p.name}</b><small>Lager: ${S.lager[pid]||0} Stk.</small></div>
-        <button class="btn" onclick="assignShelf('${id}','${pid}')">Wählen</button></div>`;
-      });
+  let html=`<h2>🗄️ Regal (${zoneName})</h2>
+  <div class="sub">${d.parts.length} Produktplatz${d.parts.length>1?"̈e":""} · Regal-System Stufe ${S.shelfTier}</div>`;
+  const taken=new Set();
+  Object.values(S.shelves).forEach(sh=>(sh.parts||[]).forEach(pt=>{ if(pt.prod) taken.add(pt.prod); }));
+  d.parts.forEach((pt,pi)=>{
+    if(pt.prod){
+      const p=P[pt.prod];
+      const lag=S.lager[pt.prod]||0;
+      html+=`<div class="row">
+        <div class="em">${p.emoji}</div>
+        <div class="info"><b>${p.name}${isLiq(pt.prod)?' <span class="tag season">🏷️ −'+Math.round(S.liqPct*100)+'%</span>':''}${isPromo(pt.prod)?' <span class="tag hit">🔥 Aktion</span>':''}</b>
+        <small>${pt.units}/${shelfCap()} im Regal · ${lag} im Lager · VK ${fmt(vkEff(pt.prod))}</small></div>
+        <button class="btn sec" onclick="clearShelfPart('${id}',${pi})">✕</button>
+        <button class="btn green" onclick="refillPart('${id}',${pi})" ${lag<=0||pt.units>=shelfCap()?"disabled":""}>📦</button>
+      </div>`;
     }else{
-      html+=`<p style="font-size:13px;color:var(--ink-soft)">Kein passendes freies Produkt. Nimm unter «Sortiment» neue ${slot.zone==="hall"?"Produkte":DEPTS[slot.zone].name+"-Produkte"} auf.</p>`;
+      const options=S.assortment.filter(pid=>{
+        if(taken.has(pid)) return false;
+        if(slot.zone==="hall") return S.depts.includes(P[pid].dept);
+        return P[pid].dept===slot.zone;
+      });
+      html+=`<div class="secTitle">Platz ${pi+1}: Produkt wählen</div>`;
+      if(options.length){
+        html+=`<div class="chipRow">`+options.map(pid=>
+          `<button class="chip big" onclick="assignShelfPart('${id}',${pi},'${pid}')">${P[pid].emoji}</button>`).join("")+`</div>`;
+      }else{
+        html+=`<p style="font-size:12.5px;color:var(--ink-soft)">Kein passendes freies Produkt im Sortiment.</p>`;
+      }
     }
-  }
+  });
   html+=`<button class="btn sec" style="margin-top:10px" onclick="closeDialog()">Schliessen</button>`;
   showDialog(html);
 }
-window.refill=function(id){
-  const d=shelfData(id);
-  const lag=S.lager[d.prod]||0;
-  const n=Math.min(shelfCap()-d.units, lag);
-  d.units+=n; S.lager[d.prod]-=n;
+window.refillPart=function(id,pi){
+  const pt=shelfData(id).parts[pi];
+  const lag=S.lager[pt.prod]||0;
+  const n=Math.min(shelfCap()-pt.units, lag);
+  pt.units+=n; S.lager[pt.prod]-=n;
   const slot=slotById(id);
   effects.push({x:slot.x,y:slot.y-24,txt:"+"+n+" 📦",t:1.2,col:"#1f8a4d"});
   closeDialog(); save();
 };
-window.assignShelf=function(id,pid){
-  const d=shelfData(id);
-  d.prod=pid; d.units=0;
+window.assignShelfPart=function(id,pi,pid){
+  const pt=shelfData(id).parts[pi];
+  pt.prod=pid; pt.units=0;
   closeDialog(); openShelf(id);
 };
-window.clearShelf=function(id){
-  const d=shelfData(id);
-  if(d.prod && d.units>0){ S.lager[d.prod]=(S.lager[d.prod]||0)+d.units; }
-  d.prod=null; d.units=0;
+window.clearShelfPart=function(id,pi){
+  const pt=shelfData(id).parts[pi];
+  if(pt.prod && pt.units>0){ S.lager[pt.prod]=(S.lager[pt.prod]||0)+pt.units; }
+  pt.prod=null; pt.units=0;
   closeDialog(); openShelf(id);
 };
 
@@ -2107,24 +3215,49 @@ function loop(now){
 }
 
 /* ================= START ================= */
-function tutorial(){
-  showDialog(`
-    <h2>🛒 Willkommen im Markt-Tycoon!</h2>
-    <div class="sub">by Nextform Games · Vom Dorfladen zum 24h-XL-Supermarkt – 5 Level warten auf dich.</div>
-    <div class="stat"><span>👆 Wischen</span><b>Umherschauen im Laden</b></div>
-    <div class="stat"><span>🗄️ Regal antippen</span><b>Auffüllen</b></div>
-    <div class="stat"><span>🧾 Kasse antippen</span><b>Kassieren</b></div>
-    <div class="stat"><span>🟤 Dreck & 🍂 Abfall</span><b>Antippen = putzen</b></div>
-    <div class="stat"><span>🚶 Dreckiger Vorplatz</span><b>Leute laufen am Laden vorbei!</b></div>
-    <div class="stat"><span>🍽️ Mittag</span><b>Der grosse Rush – Regale vorher füllen!</b></div>
-    <div class="stat"><span>🧍 Am Anfang</span><b>Bist du ganz allein!</b></div>
-    <p style="font-size:12.5px;color:var(--ink-soft);margin-top:10px">
-    Bau alles auf 100% aus, dann geht's in den nächsten, grösseren Laden.
-    Verdient wird nur über Verkäufe. Viel Erfolg! 💪</p>
-    <button class="btn" onclick="closeDialog();S.tutorialDone=true;paused=false;save();">Laden öffnen ▶</button>
-  `);
+function tutorialStep(n){
   paused=true;
+  if(n===1) showDialog(`
+    <div style="text-align:center;font-size:46px;line-height:1.1">🏪✨</div>
+    <h2 style="text-align:center">Dein Weg zum Tycoon</h2>
+    <div class="sub" style="text-align:center">by Nextform Games</div>
+    <p style="font-size:13.5px">Du startest im kleinen <b>Dorfladen</b> – ganz allein hinter der Kasse.
+    Bau ihn auf <b>100%</b> aus, zieh um und arbeite dich durch <b>10 Level</b> hoch bis zum
+    <b>24h Welt-Markt</b> mit riesigem Parkplatz! 🅿️</p>
+    <div class="stat"><span>🎯 Ziel</span><b>10 Level · 100% Ausbau</b></div>
+    <div class="stat"><span>💰 Geld</span><b>Gibt's nur über Verkäufe</b></div>
+    <button class="btn" onclick="tutorialStep(2)">Weiter ▶ (1/3)</button>
+    <button class="btn sec" onclick="skipTutorial()">Überspringen ✕</button>
+  `);
+  if(n===2) showDialog(`
+    <div style="text-align:center;font-size:46px;line-height:1.1">👆🗺️</div>
+    <h2 style="text-align:center">So steuerst du</h2>
+    <div class="stat"><span>👆 Wischen</span><b>Umherschauen · 🔍 = Übersicht</b></div>
+    <div class="stat"><span>🗄️ Regal antippen</span><b>Auffüllen & Produkte zuteilen</b></div>
+    <div class="stat"><span>🧾 Kasse antippen</span><b>Selber kassieren</b></div>
+    <div class="stat"><span>🟤 Dreck antippen</span><b>Putzen (auch der Vorplatz!)</b></div>
+    <div class="stat"><span>😱 DIEB!</span><b>Antippen und fassen, solange er sichtbar ist!</b></div>
+    <button class="btn" onclick="tutorialStep(3)">Weiter ▶ (2/3)</button>
+    <button class="btn sec" onclick="skipTutorial()">Überspringen ✕</button>
+  `);
+  if(n===3) showDialog(`
+    <div style="text-align:center;font-size:46px;line-height:1.1">📈💡</div>
+    <h2 style="text-align:center">So wirst du reich</h2>
+    <div class="stat"><span>📦 Kreislauf</span><b>Einkaufen → einräumen → verkaufen</b></div>
+    <div class="stat"><span>🍽️ Mittag & Feierabend</span><b>Rush! Regale vorher füllen</b></div>
+    <div class="stat"><span>📄 Rechnungen</span><b>Auf Pump kaufen – aber pünktlich zahlen!</b></div>
+    <div class="stat"><span>🗓️ Tagesplanung</span><b>Jeden Morgen: Aktionen & Liquidationen</b></div>
+    <div class="stat"><span>⬆️ Upgrades</span><b>Regale, Kassen, Kameras, Personalraum ...</b></div>
+    <p style="font-size:12.5px;color:var(--ink-soft);margin-top:8px">Alles Weitere zeigt dir der Laden selbst. Viel Erfolg, Chef! 💪</p>
+    <button class="btn green" onclick="closeDialog();S.tutorialDone=true;paused=false;save();">Laden öffnen ▶</button>
+  `);
 }
+window.tutorialStep=tutorialStep;
+window.skipTutorial=function(){
+  closeDialog(); S.tutorialDone=true; paused=false; save();
+  toast("Viel Erfolg, Chef! 💪");
+};
+function tutorial(){ tutorialStep(1); }
 function boot(){
   const hadSave=load();
   ensureStats();
