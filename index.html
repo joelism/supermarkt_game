@@ -34,6 +34,13 @@ body{
 #topbar .clock{font-size:11.5px;color:#b9c6cf}
 #topbar .clean{font-size:12px;text-align:right;line-height:1.2}
 .cleanbar{width:64px;height:6px;background:#3b4b58;border-radius:3px;overflow:hidden;margin-top:3px;margin-left:auto}
+#reqBox{position:absolute;left:10px;right:10px;bottom:66px;z-index:18;display:flex;flex-direction:column;gap:6px;pointer-events:none}
+.reqCard{pointer-events:auto;background:rgba(28,36,44,.94);color:#fff;border-radius:12px;padding:8px 10px;
+  display:flex;align-items:center;gap:8px;font-size:12.5px;box-shadow:0 4px 14px rgba(0,0,0,.3);
+  animation:reqIn .25s ease}
+.reqCard span{flex:1;min-width:0}
+.reqCard .chip{margin:0;padding:7px 11px;background:#3a4753;border-color:transparent;color:#fff}
+@keyframes reqIn{from{transform:translateY(14px);opacity:0}to{transform:none;opacity:1}}
 .cleanbar>i{display:block;height:100%;background:var(--green);border-radius:3px;transition:width .4s}
 #stage{flex:1;position:relative;overflow:hidden;background:#7fae70}
 canvas{display:block;touch-action:none;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
@@ -103,6 +110,7 @@ canvas{display:block;touch-action:none;position:absolute;left:50%;top:50%;transf
 .stat b.plus{color:var(--green)} .stat b.minus{color:var(--red)}
 .stat.total{border-top:2px solid var(--ink);border-bottom:0;margin-top:4px;font-weight:800;font-size:15px}
 .dialog .btn{width:100%;margin-top:14px;padding:13px;font-size:14px}
+.dialog .row .btn{width:auto;margin-top:0;padding:9px 13px;font-size:12.5px}
 .chipRow{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 12px}
 .chip{border:2px solid #dde3e6;background:#fff;border-radius:12px;padding:7px 10px;
   font-family:inherit;font-weight:800;font-size:13px;color:var(--ink);cursor:pointer}
@@ -129,8 +137,14 @@ canvas{display:block;touch-action:none;position:absolute;left:50%;top:50%;transf
     <div class="clock" id="uiClock">08:00</div>
   </div>
   <div class="clean">
-    Sauberkeit
-    <div class="cleanbar"><i id="uiClean" style="width:100%"></i></div>
+    <div onclick="showCleanInfo()" style="cursor:pointer">
+      Sauberkeit
+      <div class="cleanbar"><i id="uiClean" style="width:100%"></i></div>
+    </div>
+    <div onclick="showMoodInfo()" style="cursor:pointer">
+      Team
+      <div class="cleanbar"><i id="uiMood" style="width:85%"></i></div>
+    </div>
   </div>
 </div>
 
@@ -138,7 +152,8 @@ canvas{display:block;touch-action:none;position:absolute;left:50%;top:50%;transf
   <canvas id="cv"></canvas>
   <button id="zoomBtn">🗺️</button>
   <button id="setBtn">⚙️</button>
-  <div id="panHint">👆 Wische, um dich umzusehen</div>
+  <div id="reqBox"></div>
+<div id="panHint">👆 Wischen zum Umsehen · 🤏 Zwei Finger zum Zoomen</div>
 </div>
 
 <div id="nav">
@@ -300,11 +315,12 @@ function defaultState(){
     staffRoom:100,
     billboard:false, busstop:false, reno:false,
     invoices:[], invSeq:1, revHist:[],
-    priceAdj:{}, promoId:null, promoDay:0,
+    priceAdj:{}, prodLvl:{}, promoId:null, promoDay:0,
     liqPct:0, liqSet:{}, liqDay:0, liqAll:false,
     parking:2,
     staffRoomLvl:1, shelfTier:1, kasseTier:1, scanTier:1,
     camTier:0, gateTier:0, office:false, parkMeterTier:0,
+    mood:85, lunchPlan:{}, breaks:{},
     stats:{},
     dayLog:{rev:0, theft:0, thefts:0, buys:0, sold:0, angry:0, inv:0, caught:0, fines:0, pfees:0},
     lifetime:{rev:0, days:0},
@@ -349,16 +365,38 @@ function load(){
         const o=d.shelves[k];
         sh[k]= o && o.parts ? o : {parts:[{prod:(o&&o.prod)||null, units:(o&&o.units)||0}]};
       });
+      {
+        const lv=Math.max(1,Math.min(5,Math.round((20+(n.level||0)*5)/10)));
+        Object.values(sh).forEach(x=>{ if(!x.lvl) x.lvl=lv; });
+      }
       n.shelves=sh;
-      ["liqSet"].forEach(k=>{ if(typeof n[k]!=="object"||!n[k]) n[k]={}; });
+      ["liqSet","prodLvl"].forEach(k=>{ if(typeof n[k]!=="object"||!n[k]) n[k]={}; });
+      Object.keys(n.priceAdj||{}).forEach(id=>{             // Alt: Preisaufschlag -> Qualitätsstufe
+        const adj=n.priceAdj[id];
+        if(adj>=2.5) n.prodLvl[id]=3; else if(adj>0) n.prodLvl[id]=Math.max(n.prodLvl[id]||1,2);
+      });
+      n.priceAdj={};
       S=n; ensureStats(); return true;
     }
     if(d.v!==3) return false;
     S=Object.assign(defaultState(), d);
-    Object.keys(S.shelves||{}).forEach(k=>{
-      const o=S.shelves[k];
-      if(o && !o.parts) S.shelves[k]={parts:[{prod:o.prod||null,units:o.units||0}]};
+    if(typeof S.prodLvl!=="object"||!S.prodLvl) S.prodLvl={};
+    Object.keys(S.priceAdj||{}).forEach(id=>{
+      const adj=S.priceAdj[id];
+      if(adj>=2.5) S.prodLvl[id]=3; else if(adj>0) S.prodLvl[id]=Math.max(S.prodLvl[id]||1,2);
     });
+    S.priceAdj={};
+    {
+      const lv=Math.max(1,Math.min(5,Math.round((20+(S.level||0)*5)/10)));
+      Object.keys(S.shelves||{}).forEach(k=>{
+        const o=S.shelves[k];
+        if(o && !o.parts) S.shelves[k]={parts:[{prod:o.prod||null,units:o.units||0}], lvl:o.lvl||lv};
+        else if(o && !o.lvl) o.lvl=lv;
+      });
+    }
+    if(typeof S.mood!=="number") S.mood=85;
+    ["lunchPlan","breaks"].forEach(k=>{ if(typeof S[k]!=="object"||!S[k]) S[k]={}; });
+  Object.keys(S.lunchPlan).forEach(k=>{ if(!Array.isArray(S.lunchPlan[k])) delete S.lunchPlan[k]; });
     ensureStats(); return true;
   }catch(e){ canStore=false; return false; }
 }
@@ -368,7 +406,9 @@ const $ = id => document.getElementById(id);
 const fmt = n => "CHF " + (Math.round(n*20)/20).toFixed(2).replace(/\.00$/,".–");
 const fmtS = n => "CHF " + Math.round(n).toLocaleString("de-CH");
 function season(){ return SEASONS[Math.floor((S.day-1)/5)%4]; }
-function vkOf(id){ return P[id].vk + ((S.priceAdj&&S.priceAdj[id])||0); }
+const PLVL_MULT=[1,1.25,1.55], PLVL_POP=[1,1.05,1.10];
+function prodLvl(id){ return (S.prodLvl&&S.prodLvl[id])||1; }
+function vkOf(id){ return P[id].vk*PLVL_MULT[prodLvl(id)-1]; }
 function isPromo(id){ return S.promoId===id && S.promoDay===S.day; }
 function isLiq(id){
   if(!S.liqPct) return false;
@@ -383,7 +423,7 @@ function popOf(p){
   let v = !p.season ? p.pop : (p.season===season() ? p.pop*3 : p.pop*0.25);
   if(isPromo(p.id)) v*=2;                                 // Aktion zieht Kundschaft an
   if(isLiq(p.id)) v*= 1 + S.liqPct*4;                     // Ausverkauf: je mehr Rabatt, desto begehrter
-  v /= 1 + ((S.priceAdj&&S.priceAdj[p.id])||0)*0.06;      // teurer = minim weniger beliebt
+  v *= PLVL_POP[prodLvl(p.id)-1];                          // Premium-Qualität zieht Kundschaft an
   return v;
 }
 function scanTime(){ return [3.5,2.8,2.2][S.scanTier-1]||3.5; }
@@ -393,7 +433,7 @@ function theftChance(){
   return Math.max(0.02, 0.20 - guardAvail()*0.08 - S.camTier*0.03 - S.gateTier*0.02);
 }
 function cleanPct(){ return Math.max(0, Math.min(100, 100 - dirt.length*6 - odirt.length*4)); }
-function staffEff(){ return S.staffRoom<30 ? 0.5 : 1 + 0.08*(S.staffRoomLvl-1); }
+function staffEff(){ return (S.staffRoom<30 ? 0.5 : 1 + 0.08*(S.staffRoomLvl-1)) * (0.7 + 0.5*(S.mood||85)/100); }
 function dayLen(){ return (S.closeH-S.openH)*50; }   // 12h = 600s
 function dayHour(){ return S.openH + (S.t/dayLen())*(S.closeH-S.openH); }
 function pricedHours(a,b){
@@ -414,10 +454,40 @@ function shiftRange(k){
   return [S.openH, S.closeH];
 }
 function shiftHours(k){ const r=shiftRange(k); return Math.max(0, r[1]-r[0]); }
+const LUNCH_SLOTS=["11","12","13"];
+function lunchArr(k){
+  let a=S.lunchPlan[k];
+  if(!Array.isArray(a)){
+    const base=(typeof a==="string" && LUNCH_SLOTS.includes(a))? a : "11";
+    a=S.lunchPlan[k]=Array.from({length:S.staff[k]||0}, (_,i)=> i===0? base : LUNCH_SLOTS[i%3]);
+  }
+  while(a.length<(S.staff[k]||0)) a.push(LUNCH_SLOTS[a.length%3]);
+  if(a.length>(S.staff[k]||0)) a.length=S.staff[k]||0;
+  return a;
+}
+function empAtLunch(k,i){
+  const h=dayHour();
+  const sl=+(lunchArr(k)[i]||"11");
+  return h>=sl && h<sl+1;
+}
+function lunchAway(k){
+  let n=0;
+  for(let i=0;i<(S.staff[k]||0);i++) if(empAtLunch(k,i)) n++;
+  return n;
+}
+function onBreak(k){
+  const b=S.breaks&&S.breaks[k];
+  if(b && b.day===S.day && dayHour()<b.until) return "pause";
+  if((S.staff[k]||0)>0 && lunchAway(k)>=S.staff[k]) return "lunch";
+  return null;
+}
 function staffOn(k){
   if(!S.staff[k]) return 0;
   const h=dayHour(), r=shiftRange(k);
-  return (h>=r[0] && h<r[1]) ? S.staff[k] : 0;
+  if(h<r[0] || h>=r[1]) return 0;
+  const b=S.breaks&&S.breaks[k];
+  if(b && b.day===S.day && h<b.until) return 0;
+  return Math.max(0, S.staff[k]-lunchAway(k));
 }
 function wagesPerDay(){
   let sum=0;
@@ -487,7 +557,7 @@ function completion(){
 let LY=null;
 function buildLayout(){
   const L=LV();
-  const WING_W=132, M=24, SR_H=76, CO_H=36, OF_W=112;
+  const WING_W=132, M=24, SR_H=102, CO_H=36, OF_W=112;
   const worldW=M*2+WING_W*2+L.hallW;
   // Hinterhaus-Raster
   const backHalfW=L.hallW/2-30;
@@ -500,9 +570,9 @@ function buildLayout(){
   const gang={x:M+2, y:srY+SR_H, w:worldW-2*M-4, h:CO_H};
   // Personalräume als Segmente der obersten Etage (durch Innenwände getrennt)
   const segW=gang.w;
-  const lager ={x:gang.x,                 y:srY, w:Math.round(segW*0.30), h:SR_H};
-  const staffR={x:lager.x+lager.w,        y:srY, w:Math.round(segW*0.27), h:SR_H};
-  const ruhe  ={x:staffR.x+staffR.w,      y:srY, w:Math.round(segW*0.20), h:SR_H};
+  const lager ={x:gang.x,                 y:srY, w:Math.round(segW*0.32), h:SR_H};
+  const staffR={x:lager.x+lager.w,        y:srY, w:Math.round(segW*0.30), h:SR_H};
+  const ruhe  ={x:staffR.x+staffR.w,      y:srY, w:Math.round(segW*0.19), h:SR_H};
   const tech  ={x:ruhe.x+ruhe.w,          y:srY, w:gang.x+gang.w-(ruhe.x+ruhe.w), h:SR_H};
 
   const hasBL=S.depts.includes("fleisch"), hasBR=S.depts.includes("nonfood");
@@ -526,9 +596,14 @@ function buildLayout(){
   const ckY=doorY0-118;
   const office={x:hall.x+hall.w-OF_W-8, y:ckY-84, w:OF_W, h:(doorY0-8)-(ckY-84)};
   const kassePos=[];
-  for(let kx=hall.x+56; kx<office.x-42 && kassePos.length<L.maxK; kx+=60){
-    if(Math.abs(kx-aisleX)<56) continue;             // Türbereich frei
-    kassePos.push({x:kx, y:ckY});
+  {
+    const cand=[];
+    for(let kx=hall.x+56; kx<office.x-42; kx+=60){
+      if(Math.abs(kx-aisleX)<56) continue;           // Türbereich frei
+      cand.push(kx);
+    }
+    cand.sort((a,b)=>Math.abs(a-aisleX)-Math.abs(b-aisleX));  // näheste zuerst: neue Kassen wachsen seitlich an
+    cand.slice(0,L.maxK).forEach(kx=>kassePos.push({x:kx, y:ckY}));
   }
   // Self-Scan-Reihe über die volle Breite (Mittelgang & Büro ausgespart)
   const scanXs=[];
@@ -634,11 +709,14 @@ function shelfData(id){
   const d=S.shelves[id];
   if(!d.parts) S.shelves[id]={parts:[{prod:d.prod||null,units:d.units||0}]};
   const dd=S.shelves[id];
+  if(!dd.lvl) dd.lvl=1;
   while(dd.parts.length<S.shelfTier) dd.parts.push({prod:null,units:0});
   return dd;
 }
 function shelfHasStock(id){ return shelfData(id).parts.some(pt=>pt.prod&&pt.units>0); }
-function shelfCap(){ return 20+S.level*5; }
+const SHELF_CAPS=[10,20,30,40,50];
+const SHELF_UP=[50,120,240,420];
+function shelfCap(id){ return SHELF_CAPS[(shelfData(id).lvl||1)-1]; }
 
 /* ================= LAUFZEIT ================= */
 let customers=[], dirt=[], odirt=[], effects=[], cars=[];
@@ -899,7 +977,7 @@ function catchThief(c, by){
 function customerGivesUp(c){
   c.carry.forEach(it=>{
     const pt=shelfData(it.slot).parts[it.pi];
-    if(pt && pt.prod===it.prod) pt.units=Math.min(shelfCap(), pt.units+it.qty);
+    if(pt && pt.prod===it.prod) pt.units=Math.min(shelfCap(it.slot), pt.units+it.qty);
   });
   c.carry=[]; c.angry=true; S.dayLog.angry++;
   removeFromQueue(c);
@@ -1034,8 +1112,16 @@ function tick(dt){
   if(R.dirtT<=0){
     R.dirtT=16+Math.random()*14;
     if(dirt.length<14){
-      const hl=LY.hall;
-      dirt.push({x:hl.x+50+Math.random()*(hl.w-100), y:hl.y+96+Math.random()*(hl.h-200), r:7+Math.random()*5});
+      const sCount=dirt.filter(d=>d.y<LY.gang.y+LY.gang.h).length;
+      if(Math.random()<0.30 && sCount<5){
+        const rooms=[LY.staffR, LY.staffR, LY.lager, LY.gang, LY.ruhe, LY.tech];
+        const rm=rooms[Math.random()*rooms.length|0];
+        dirt.push({x:rm.x+16+Math.random()*Math.max(20,rm.w-32),
+                   y:rm.y+18+Math.random()*Math.max(16,rm.h-30), r:6+Math.random()*5});
+      }else{
+        const hl=LY.hall;
+        dirt.push({x:hl.x+50+Math.random()*(hl.w-100), y:hl.y+96+Math.random()*(hl.h-200), r:7+Math.random()*5});
+      }
     }
   }
   // Abfall draussen
@@ -1103,15 +1189,53 @@ function tick(dt){
   // Autos bewegen
   for(let i=cars.length-1;i>=0;i--){
     const car=cars[i];
-    if(car.state==="thru"){ car.x+=170*dt; if(car.x>LY.worldW+120) cars.splice(i,1); }
+    if(car.state==="thru"){ car.x+=170*dt; if(car.x>LY.worldW+320) cars.splice(i,1); }
     else if(car.state==="in"){
       if(Math.abs(car.x-car.tx)>4){ car.x+=Math.sign(car.tx-car.x)*150*dt; }
       else{ car.x=car.tx; car.state="parked"; spawnFromCar(car); }
     }
-    else if(car.state==="out"){ car.x+=150*dt; if(car.x>LY.worldW+120) cars.splice(i,1); }
+    else if(car.state==="out"){ car.x+=150*dt; if(car.x>LY.worldW+320) cars.splice(i,1); }
+  }
+  // Team-Wohlbefinden
+  {
+    if(R.quitCd===undefined) R.quitCd=0;
+    if(!R.reqs) planBreakReqs();
+    const anyStaff=Object.values(S.staff).some(v=>v>0);
+    if(anyStaff){
+      const sDirtM=dirt.filter(d2=>d2.y<LY.gang.y+LY.gang.h).length;
+      S.mood=Math.max(0, S.mood - dt*(100/2400)*(S.staffRoom<30?1.8:1) - dt*sDirtM*(100/5200));
+      if(S.staffRoomLvl>=2) S.mood=Math.min(100, S.mood + dt*(100/9000)*(S.staffRoomLvl-1));
+      if(S.staffRoomLvl>=4) S.mood=Math.min(100, S.mood + dt*(100/2600));   // Ruheraum: Schlaf regeneriert
+      R.quitCd-=dt;
+      if(S.mood<15 && R.quitCd<=0 && Math.random()<dt*0.06){
+        const roles=Object.keys(S.staff).filter(r2=>S.staff[r2]>0);
+        const r2=roles[Math.random()*roles.length|0];
+        S.staff[r2]--;
+        toast(`😡 ${STAFF[r2].name} hat gekündigt! Stell im Personal-Tab neu ein.`, true);
+        R.quitCd=90; S.mood=Math.min(100,S.mood+18);
+        if(currentPanel==="personal") renderPanel();
+      }
+    }
+    // 30-Min-Pausen-Anfragen auslösen
+    const hNow2=dayHour();
+    (R.reqs||[]).forEach(rq=>{
+      if(!rq.fired && hNow2>=rq.at && S.staff[rq.role]>0 && !onBreak(rq.role)){
+        rq.fired=true;
+        BREQ.push({role:rq.role, t:26});
+        renderReqs();
+      }
+    });
+    for(let i=BREQ.length-1;i>=0;i--){
+      BREQ[i].t-=dt;
+      if(BREQ[i].t<=0){ S.mood=Math.max(0,S.mood-4); BREQ.splice(i,1); renderReqs(); }
+    }
   }
   // Personalraum
-  S.staffRoom=Math.max(0, S.staffRoom - dt*(100/1500)*(1 - 0.15*(S.staffRoomLvl-1)));
+  {
+    const sDirt=dirt.filter(d=>d.y<LY.gang.y+LY.gang.h).length;
+    const per=24-3*(S.staffRoomLvl-1);          // bessere Räume verkraften mehr
+    S.staffRoom=Math.max(0, 100 - sDirt*per);
+  }
   // Personal
   const eff=staffEff();
   const kOn=staffOn("kassierer");
@@ -1132,14 +1256,15 @@ function tick(dt){
       R.staffFill=4/(fOn*eff);
       let best=null;
       activeSlots().forEach(s=>{
+        const cap=shelfCap(s.id);
         shelfData(s.id).parts.forEach((pt,pi)=>{
-          if(pt.prod && pt.units<shelfCap() && (S.lager[pt.prod]||0)>0){
-            if(!best || pt.units/shelfCap() < best.pt.units/shelfCap()) best={s,pt,pi};
+          if(pt.prod && pt.units<cap && (S.lager[pt.prod]||0)>0){
+            if(!best || pt.units/cap < best.frac) best={s,pt,pi,cap,frac:pt.units/cap};
           }
         });
       });
       if(best){
-        const n=Math.min(3, shelfCap()-best.pt.units, S.lager[best.pt.prod]);
+        const n=Math.min(3, best.cap-best.pt.units, S.lager[best.pt.prod]);
         best.pt.units+=n; S.lager[best.pt.prod]-=n;
       }
     }
@@ -1212,14 +1337,58 @@ let PLAN=null;
 window.showPlanner=function(){
   if(!PLAN) PLAN={promo:null, liqPct:(S.liqAll?S.liqPct:0), liqIds:{}, all:S.liqAll};
   const cAkt=cost(30);
+  const seasNow=season();
+  // Chips nach Abteilung gruppiert – bleibt auch mit 20+ Produkten übersichtlich
+  function chipGroups(renderChip){
+    let g="";
+    Object.keys(DEPTS).forEach(dk=>{
+      const ids=S.assortment.filter(id=>P[id].dept===dk);
+      if(!ids.length) return;
+      g+=`<div style="font-size:10px;font-weight:800;color:var(--ink-soft);letter-spacing:.3px;margin:5px 0 0">${DEPTS[dk].emoji} ${DEPTS[dk].name.toUpperCase()}</div>
+      <div class="chipRow" style="margin:3px 0 4px">`;
+      ids.forEach(id=>g+=renderChip(id));
+      g+=`</div>`;
+    });
+    return g;
+  }
+  function seasonBadge(p){
+    if(!p.season) return "";
+    return `<span style="font-size:8.5px;vertical-align:top">${SEASON_EMOJI[p.season]}</span>`;
+  }
+  function chipStyle(p){
+    return p.season===seasNow? "border-color:#39c46e;box-shadow:0 0 0 1.5px rgba(57,196,110,.35);" : "";
+  }
   let h=`<h2>🗓️ Tagesplanung – Tag ${S.day}</h2>
-  <div class="sub">${SEASON_EMOJI[season()]} ${season()} · Was planst du für heute?</div>`;
-  h+=`<div class="planTitle">🔥 Tages-Aktion (Kunden kaufen 2×) · ${fmtS(cAkt)}</div><div class="chipRow">`;
-  h+=`<button class="chip ${PLAN.promo===null?"on":""}" onclick="planPromo(null)">Keine</button>`;
-  S.assortment.forEach(id=>{
-    h+=`<button class="chip big ${PLAN.promo===id?"on":""}" onclick="planPromo('${id}')" title="${P[id].name}">${P[id].emoji}</button>`;
+  <div class="sub">${SEASON_EMOJI[seasNow]} ${seasNow} · Was planst du für heute? <span style="color:#1f8a4d">Grün umrandet = Saison jetzt</span></div>`;
+  h+=`<div class="planTitle">🔥 Tages-Aktion (Kunden kaufen 2×) · ${fmtS(cAkt)}</div>`;
+  h+=`<div class="chipRow" style="margin-bottom:0"><button class="chip ${PLAN.promo===null?"on":""}" onclick="planPromo(null)">Keine</button></div>`;
+  h+=chipGroups(id=>{
+    const p=P[id];
+    return `<button class="chip big ${PLAN.promo===id?"on":""}" style="${chipStyle(p)}" onclick="planPromo('${id}')" title="${p.name}">${p.emoji}${seasonBadge(p)}</button>`;
   });
-  h+=`</div>`;
+  if(PLAN.promo) h+=`<div style="font-size:12.5px;margin:-2px 0 6px">→ Aktion: <b>${P[PLAN.promo].emoji} ${P[PLAN.promo].name}</b></div>`;
+  {
+    const roles=["kassierer","auffueller","putz","sicherheit"].filter(r=>S.staff[r]>0);
+    if(roles.length){
+      if(!PLAN.lunch) PLAN.lunch={};
+      roles.forEach(r=>{
+        const cur=lunchArr(r);
+        if(!Array.isArray(PLAN.lunch[r]) || PLAN.lunch[r].length!==cur.length) PLAN.lunch[r]=cur.slice();
+      });
+      const openSlots=LUNCH_SLOTS.filter(s2=> +s2>=S.openH && +s2<S.closeH);
+      h+=`<div class="planTitle">☕ Mittagspause (1 Std. Pflicht) – Schichten: ${openSlots.map(s2=>s2+"–"+(+s2+1)).join(" · ")}</div>`;
+      roles.forEach(r=>{
+        PLAN.lunch[r].forEach((sl,i)=>{
+          if(!openSlots.includes(sl)) sl=PLAN.lunch[r][i]=openSlots[0]||"11";
+          h+=`<div class="chipRow" style="margin:2px 0 3px;align-items:center">
+            <span style="font-size:12px;width:118px;flex-shrink:0">${STAFF[r].emoji} ${STAFF[r].name}${S.staff[r]>1?" "+(i+1):""}</span>
+            ${openSlots.map(s2=>`<button class="chip ${sl===s2?"on":""}" onclick="planLunch('${r}',${i},'${s2}')">${s2}–${+s2+1}</button>`).join("")}
+          </div>`;
+        });
+      });
+      h+=`<p style="font-size:11.5px;color:var(--ink-soft);margin:2px 0 6px">⚠️ 12–13 ist Mittagsrush. Mit mehreren Angestellten pro Rolle lohnt sich das Verteilen auf alle drei Schichten!</p>`;
+    }
+  }
   h+=`<div class="planTitle">🏷️ Liquidation / Ausverkauf (Rabatt lockt Käufer)</div><div class="chipRow">`;
   h+=`<button class="chip ${PLAN.liqPct===0?"on":""}" onclick="planLiqPct(0)">aus</button>`;
   [0.25,0.33,0.5,0.75].forEach(p=>{
@@ -1227,26 +1396,42 @@ window.showPlanner=function(){
   });
   h+=`</div>`;
   if(PLAN.liqPct>0){
-    h+=`<div class="chipRow">`;
-    h+=`<button class="chip ${PLAN.all?"on":""}" onclick="planAll()">ALLES</button>`;
-    S.assortment.forEach(id=>{
-      h+=`<button class="chip big ${(!PLAN.all&&PLAN.liqIds[id])?"on":""}" onclick="planLiqProd('${id}')" title="${P[id].name}">${P[id].emoji}</button>`;
+    const offSeason=S.assortment.filter(id=>P[id].season && P[id].season!==seasNow);
+    h+=`<div class="chipRow" style="margin-bottom:0">
+      <button class="chip ${PLAN.all?"on":""}" onclick="planAll()">ALLES</button>
+      <button class="chip" onclick="planLiqSeason()" ${offSeason.length?"":"disabled style='opacity:.4'"}>🍂 Saison vorbei (${offSeason.length})</button>
+    </div>`;
+    h+=chipGroups(id=>{
+      const p=P[id];
+      return `<button class="chip big ${(!PLAN.all&&PLAN.liqIds[id])?"on":""}" style="${chipStyle(p)}" onclick="planLiqProd('${id}')" title="${p.name}">${p.emoji}${seasonBadge(p)}</button>`;
     });
-    h+=`</div>
-    <p style="font-size:12px;color:var(--ink-soft);margin:0 0 4px">Je höher der Rabatt, desto schneller ist die Ware weg – perfekt für Saisonartikel oder vor dem Umzug. «ALLES» gilt, bis du es hier wieder ausschaltest.</p>`;
+    const selN=PLAN.all? S.assortment.length : Object.keys(PLAN.liqIds).length;
+    if(selN>0){
+      const names=PLAN.all? "das ganze Sortiment" :
+        Object.keys(PLAN.liqIds).slice(0,4).map(id=>P[id].emoji+" "+P[id].name).join(", ")
+        + (selN>4? ` +${selN-4} weitere` : "");
+      h+=`<div style="font-size:12.5px;margin:2px 0 4px">→ Ausverkauf −${Math.round(PLAN.liqPct*100)}%: <b>${names}</b></div>`;
+    }
+    h+=`<p style="font-size:11.5px;color:var(--ink-soft);margin:2px 0 4px">«ALLES» gilt, bis du es hier wieder ausschaltest – perfekt vor dem Umzug.</p>`;
   }
   if(S.liqAll && PLAN.all && PLAN.liqPct>0){
     h+=`<p style="font-size:12px;color:var(--accent-dark);font-weight:700">🏷️ Total-Liquidation läuft (−${Math.round(S.liqPct*100)}%).</p>`;
   }
-  h+=`<button class="btn green" onclick="planStart()">Tag ${S.day} starten ▶</button>
-  <button class="btn sec" onclick="skipPlan()">Ohne Planung starten</button>`;
+  h+=`<button class="btn green" onclick="planStart()">Tag ${S.day} starten ▶</button>`;
   showDialog(h);
 };
 window.planPromo=function(id){ PLAN.promo = (PLAN.promo===id)? null : id; showPlanner(); };
 window.planLiqPct=function(p){ PLAN.liqPct=p; if(p===0){PLAN.all=false;PLAN.liqIds={};} showPlanner(); };
 window.planLiqProd=function(id){ PLAN.all=false; if(PLAN.liqIds[id]) delete PLAN.liqIds[id]; else PLAN.liqIds[id]=true; showPlanner(); };
 window.planAll=function(){ PLAN.all=!PLAN.all; if(PLAN.all) PLAN.liqIds={}; showPlanner(); };
+window.planLunch=function(r,i,slot){ if(!PLAN.lunch) PLAN.lunch={}; if(!Array.isArray(PLAN.lunch[r])) PLAN.lunch[r]=lunchArr(r).slice(); PLAN.lunch[r][i]=slot; showPlanner(); };
+window.planLiqSeason=function(){
+  PLAN.all=false; PLAN.liqIds={};
+  S.assortment.forEach(id=>{ const p=P[id]; if(p.season && p.season!==season()) PLAN.liqIds[id]=true; });
+  showPlanner();
+};
 window.planStart=function(){
+  if(PLAN.lunch){ S.lunchPlan={}; Object.keys(PLAN.lunch).forEach(k=>{ S.lunchPlan[k]=Array.isArray(PLAN.lunch[k])? PLAN.lunch[k].slice() : []; }); }
   if(PLAN.promo){
     if(pay(cost(30))){ S.promoId=PLAN.promo; S.promoDay=S.day;
       toast(`🔥 AKTION heute: ${P[PLAN.promo].emoji} ${P[PLAN.promo].name} – doppelt gekauft!`, true);
@@ -1263,11 +1448,75 @@ window.planStart=function(){
   PLAN=null; startNextDay();
 };
 window.skipPlan=function(){ PLAN=null; startNextDay(); };
+const BREQ=[];
+function planBreakReqs(){
+  R.reqs=[];
+  const roles=["kassierer","auffueller","putz","sicherheit"].filter(r=>S.staff[r]>0);
+  const vFrom=S.openH+0.7, vTo=Math.min(10.8, S.closeH-1);
+  const cluster=(Math.random()<0.25 && vTo>vFrom)? vFrom+Math.random()*(vTo-vFrom) : null;
+  roles.forEach(r=>{
+    if(vTo>vFrom) R.reqs.push({role:r, at: cluster!==null? cluster : vFrom+Math.random()*(vTo-vFrom)});
+    if(S.closeH>14.6) R.reqs.push({role:r, at: 13.2+Math.random()*(S.closeH-1-13.2)});
+  });
+}
+window.showCleanInfo=function(){
+  showDialog(`
+    <h2>🧹 Sauberkeit: ${Math.round(cleanPct())}%</h2>
+    <div class="sub">Dreck im Laden, Abfall auf dem Vorplatz und Flecken in der Personal-Etage.</div>
+    <p style="font-size:13px">Ein sauberer Laden zieht mehr Kundschaft an – bei viel Dreck bleiben Kunden weg.
+    In der <b>Personal-Etage</b> drückt jeder Fleck zusätzlich auf die Team-Laune.</p>
+    <p style="font-size:13px"><b>So bleibst du sauber:</b><br>
+    🧹 Die Putzkraft wischt automatisch – auch oben in der Personal-Etage.<br>
+    👆 Du kannst jeden Fleck und Abfall selbst wegtippen.<br>
+    🏢 Bessere Personalraum-Stufen verkraften mehr Flecken.</p>
+    <button class="btn sec" onclick="closeDialog()">Alles klar</button>`);
+};
+window.showMoodInfo=function(){
+  const eff=Math.round((0.7+0.5*(S.mood||85)/100)*100);
+  showDialog(`
+    <h2>😊 Team-Laune: ${Math.round(S.mood)}%</h2>
+    <div class="sub">Aktuelles Arbeitstempo deines Teams: ${eff}%</div>
+    <p style="font-size:13px"><b>Laune steigt durch:</b><br>
+    ✓ Angenommene 30-Min-Pausen (+8)<br>
+    🛋️ Personalraum-Ausbau (passive Erholung ab Stufe 2)<br>
+    💤 Ruheraum (Stufe 4): Schlafen in der Pause regeneriert stark</p>
+    <p style="font-size:13px"><b>Laune sinkt durch:</b><br>
+    ✕ Abgelehnte (−6) oder ignorierte (−4) Pausen-Anfragen<br>
+    🗑️ Abfall in der Personal-Etage – jeder Fleck zieht dauerhaft runter<br>
+    🤢 Verdreckter Personalraum (unter 30%)</p>
+    <p style="font-size:13px;color:var(--red)"><b>⚠️ Im roten Bereich (unter 15%) kündigen Mitarbeitende!</b></p>
+    <button class="btn sec" onclick="closeDialog()">Alles klar</button>`);
+};
+window.acceptBreak=function(i){
+  const rq=BREQ[i]; if(!rq) return;
+  S.breaks[rq.role]={day:S.day, until:dayHour()+0.5};
+  S.mood=Math.min(100, S.mood+8);
+  toast(`☕ ${STAFF[rq.role].name} macht 30 Min Pause – das Team freut's!`);
+  BREQ.splice(i,1); renderReqs(); save();
+};
+window.declineBreak=function(i){
+  const rq=BREQ[i]; if(!rq) return;
+  S.mood=Math.max(0, S.mood-6);
+  effects.push({x:LY.staffR.x+LY.staffR.w/2, y:LY.staffR.y+20, txt:"💢", t:1.4, col:"#d33a2f"});
+  BREQ.splice(i,1); renderReqs(); save();
+};
+function renderReqs(){
+  const box=$("reqBox");
+  if(!box) return;
+  box.innerHTML=BREQ.map((rq,i)=>`
+    <div class="reqCard">
+      <span>${STAFF[rq.role].emoji} <b>${STAFF[rq.role].name}</b> fragt: 30 Min Pause?</span>
+      <button class="chip" onclick="acceptBreak(${i})">✓ Ja</button>
+      <button class="chip" onclick="declineBreak(${i})">✕ Nein</button>
+    </div>`).join("");
+}
 function startNextDay(){
   const dead=S.invoices.find(v=>S.day>v.due+MONTH_DAYS);
   if(dead){ gameOver(dead); return; }
   closeDialog(); paused=false;
   R.spawn=1.5; R.lunch=false; R.rush=false;
+  S.breaks={}; BREQ.length=0; Object.keys(BW).forEach(k=>delete BW[k]);
+  planBreakReqs(); renderReqs();
   const od=worstOverdue();
   if(od) toast(`⚠️ MAHNUNG! Rechnung zahlen – Laden zu in ${od.due+MONTH_DAYS-S.day} Tagen!`, true);
   else if(S.money<0) toast("⚠️ Du bist im Minus – verkauf mehr!");
@@ -1348,8 +1597,9 @@ function moveLevel(){
   buildLayout();
   const tops=S.assortment.filter(id=>P[id].dept==="food").slice(0,3);
   tops.forEach((id,i)=>{
-    const n=Math.min(shelfCap(), S.lager[id]||0);
-    S.shelves["h"+i]={parts:[{prod:id, units:n}]};
+    S.shelves["h"+i]={parts:[], lvl:1};
+    const n=Math.min(shelfCap("h"+i), S.lager[id]||0);
+    shelfData("h"+i).parts[0]={prod:id, units:n};
     S.lager[id]=(S.lager[id]||0)-n;
   });
   camCenterDoor(); save();
@@ -1371,7 +1621,7 @@ window.resetAssortment=function(){
   S.assortment.slice().forEach(id=>{
     if(!keep.includes(id)){
       refund+=(S.lager[id]||0)*P[id].ek*0.5;
-      delete S.lager[id]; delete S.priceAdj[id];
+      delete S.lager[id]; delete S.prodLvl[id];
     }
   });
   S.assortment=keep.slice();
@@ -1380,7 +1630,7 @@ window.resetAssortment=function(){
   keep.slice(0,3).forEach((id,i)=>{
     const pt=shelfData("h"+i).parts[0];
     pt.prod=id;
-    const n=Math.min(shelfCap(), S.lager[id]||0);
+    const n=Math.min(shelfCap("h"+i), S.lager[id]||0);
     pt.units=n; S.lager[id]=(S.lager[id]||0)-n;
   });
   toast(refund>0? "♻️ Sortiment neu! Restlager verkauft: +"+fmtS(Math.round(refund)) : "♻️ Sortiment auf Basis zurückgesetzt!", true);
@@ -1426,7 +1676,16 @@ function offlineSim(){
   const wages=wagesPerDay()*dayFrac;
   S.money+=rev-wages;
   S.lifetime.rev+=rev;
-  S.staffRoom=Math.max(0,S.staffRoom-dayFrac*40);
+  {
+    const n=Math.min(3, Math.round(dayFrac*3));
+    for(let k=0;k<n;k++){
+      if(dirt.filter(d=>d.y<LY.gang.y+LY.gang.h).length>=5 || dirt.length>=14) break;
+      const rooms=[LY.staffR, LY.lager, LY.gang];
+      const rm=rooms[Math.random()*rooms.length|0];
+      dirt.push({x:rm.x+16+Math.random()*Math.max(20,rm.w-32),
+                 y:rm.y+18+Math.random()*Math.max(16,rm.h-30), r:6+Math.random()*5});
+    }
+  }
   const mins=Math.round(elapsed/60);
   showDialog(`
     <h2>😴 Willkommen zurück!</h2>
@@ -1453,10 +1712,16 @@ function isoBounds(){
   return {minx:PJ(-40,H+40).x, maxx:PJ(W+40,-40).x,
           miny:PJ(-40,-40).y-WALLH-40, maxy:PJ(W+60,H+60).y+30};
 }
-function computeScale(){
+let userSc=null;
+function fitScale(){
   const B=isoBounds();
-  if(zoomFit) sc=Math.min(stW/(B.maxx-B.minx), stH/(B.maxy-B.miny));
-  else sc=stW/620;
+  return Math.min(stW/(B.maxx-B.minx), stH/(B.maxy-B.miny));
+}
+function baseScale(){ return stW/(stW<520? 440 : 620); }   // Handy: deutlich näher dran
+function maxScale(){ return stW/260; }
+function computeScale(){
+  if(zoomFit){ sc=fitScale(); return; }
+  sc=Math.max(fitScale(), Math.min(maxScale(), userSc!=null? userSc : baseScale()));
 }
 function clampCam(){
   const B=isoBounds();
@@ -1547,40 +1812,77 @@ function drawPerson(x,y,shirt,skin,hair,o){
 }
 function drawPersonScreen(x,y,shirt,skin,hair,o){
   o=o||{};
-  ctx.fillStyle="rgba(0,0,0,.15)";
+  const look=o.look||0;
+  ctx.fillStyle="rgba(0,0,0,.16)";
   ctx.beginPath(); ctx.ellipse(x,y+9,8,3.5,0,0,7); ctx.fill();
   const walking=o.phase!==undefined;
   const bob=walking? Math.sin(o.phase)*1.2 : 0;
-  if(walking){
-    ctx.strokeStyle="#3a4750"; ctx.lineWidth=3; ctx.lineCap="round";
-    const lp=Math.sin(o.phase)*3.2;
-    ctx.beginPath(); ctx.moveTo(x-3,y+3); ctx.lineTo(x-3+lp,y+8); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(x+3,y+3); ctx.lineTo(x+3-lp,y+8); ctx.stroke();
-  }
+  const lp=walking? Math.sin(o.phase)*3.4 : 0;
+  // Beine
+  ctx.strokeStyle="#39434c"; ctx.lineWidth=3.2; ctx.lineCap="round";
+  ctx.beginPath(); ctx.moveTo(x-3,y+3); ctx.lineTo(x-3+lp,y+8); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x+3,y+3); ctx.lineTo(x+3-lp,y+8); ctx.stroke();
+  ctx.fillStyle="#2b333b";
+  ctx.beginPath(); ctx.ellipse(x-3+lp,y+9,2.6,1.6,0,0,7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(x+3-lp,y+9,2.6,1.6,0,0,7); ctx.fill();
+  // Körper
   const bgr=ctx.createLinearGradient(0,y-8,0,y+7);
-  bgr.addColorStop(0, shirt); bgr.addColorStop(1, shade(shirt,0.72));
+  bgr.addColorStop(0, shade(shirt,1.12)); bgr.addColorStop(1, shade(shirt,0.70));
   ctx.fillStyle=bgr; rr(x-7,y-8+bob*.3,14,15,6); ctx.fill();
-  ctx.strokeStyle="rgba(0,0,0,.22)"; ctx.lineWidth=1;
+  ctx.strokeStyle="rgba(20,25,32,.45)"; ctx.lineWidth=1.4;
   rr(x-7,y-8+bob*.3,14,15,6); ctx.stroke();
-  ctx.fillStyle="rgba(255,255,255,.22)"; rr(x-6,y-7.5+bob*.3,5,4,2); ctx.fill();
+  ctx.fillStyle="rgba(255,255,255,.25)"; rr(x-6,y-7.5+bob*.3,5,4,2); ctx.fill();
+  // Arme (schwingen beim Laufen)
+  ctx.strokeStyle=shade(shirt,0.8); ctx.lineWidth=2.8;
+  ctx.beginPath(); ctx.moveTo(x-6.5,y-5+bob*.3); ctx.lineTo(x-8-lp*0.7,y+1+bob*.3); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x+6.5,y-5+bob*.3); ctx.lineTo(x+8+lp*0.7,y+1+bob*.3); ctx.stroke();
+  ctx.fillStyle=skin;
+  ctx.beginPath(); ctx.arc(x-8-lp*0.7,y+2+bob*.3,1.9,0,7); ctx.fill();
+  ctx.beginPath(); ctx.arc(x+8+lp*0.7,y+2+bob*.3,1.9,0,7); ctx.fill();
   if(o.apron){ ctx.fillStyle=o.apron; rr(x-5,y-5+bob*.3,10,11,4); ctx.fill();
-    ctx.fillStyle="rgba(0,0,0,.10)"; rr(x-5,y+1+bob*.3,10,5,3); ctx.fill(); }
+    ctx.fillStyle="rgba(0,0,0,.10)"; rr(x-5,y+1+bob*.3,10,5,3); ctx.fill();
+    ctx.strokeStyle="rgba(0,0,0,.15)"; ctx.lineWidth=1; rr(x-5,y-5+bob*.3,10,11,4); ctx.stroke(); }
   if(o.vest){ ctx.strokeStyle=o.vest; ctx.lineWidth=2.5;
     ctx.beginPath(); ctx.moveTo(x-6,y-7+bob*.3); ctx.lineTo(x+6,y+2+bob*.3); ctx.stroke(); }
-  const hgr=ctx.createLinearGradient(0,y-19,0,y-7);
-  hgr.addColorStop(0, skin); hgr.addColorStop(1, shade(skin,0.80));
-  ctx.fillStyle=hgr; ctx.beginPath(); ctx.arc(x,y-13+bob*.5,6.5,0,7); ctx.fill();
-  ctx.strokeStyle="rgba(0,0,0,.18)"; ctx.lineWidth=1;
-  ctx.beginPath(); ctx.arc(x,y-13+bob*.5,6.5,0,7); ctx.stroke();
+  // Kopf
+  const hy=y-13+bob*.5;
+  const hgr=ctx.createLinearGradient(0,hy-7,0,hy+7);
+  hgr.addColorStop(0, shade(skin,1.06)); hgr.addColorStop(1, shade(skin,0.82));
+  ctx.fillStyle=hgr; ctx.beginPath(); ctx.arc(x,hy,6.8,0,7); ctx.fill();
+  ctx.strokeStyle="rgba(20,25,32,.4)"; ctx.lineWidth=1.3;
+  ctx.beginPath(); ctx.arc(x,hy,6.8,0,7); ctx.stroke();
+  // Frisur-Varianten
   ctx.fillStyle=hair||"#3d2c1e";
-  ctx.beginPath(); ctx.arc(x,y-14.3+bob*.5,6.1,Math.PI,2*Math.PI); ctx.fill();
-  ctx.fillStyle="rgba(255,255,255,.30)";
-  ctx.beginPath(); ctx.arc(x-2.4,y-15.6+bob*.5,1.8,0,7); ctx.fill();
-  if(o.hat){
-    ctx.fillStyle=o.hat;
-    rr(x-7,y-20.5+bob*.5,14,3.5,2); ctx.fill();
-    rr(x-4.5,y-24.5+bob*.5,9,5,2); ctx.fill();
+  if(look===1){                                        // Seitenscheitel
+    ctx.beginPath(); ctx.arc(x,hy-1.3,6.3,Math.PI*0.92,Math.PI*2.02); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x+3.4,hy-4.4,3.2,2.4,0.5,0,7); ctx.fill();
+  }else if(look===2){                                  // Dutt / Pferdeschwanz
+    ctx.beginPath(); ctx.arc(x,hy-1.3,6.3,Math.PI,2*Math.PI); ctx.fill();
+    ctx.beginPath(); ctx.arc(x,hy-7.4,2.6,0,7); ctx.fill();
+  }else if(look===3){                                  // Beanie
+    ctx.fillStyle=shade(hair||"#3d2c1e",1.25);
+    ctx.beginPath(); ctx.arc(x,hy-1.6,6.4,Math.PI,2*Math.PI); ctx.fill();
+    ctx.fillStyle="rgba(255,255,255,.25)"; ctx.fillRect(x-6.2,hy-2.6,12.4,1.6);
+    ctx.fillStyle=hair||"#3d2c1e";
+  }else{                                               // Standard
+    ctx.beginPath(); ctx.arc(x,hy-1.3,6.3,Math.PI,2*Math.PI); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x-4.6,hy-2.6,1.8,2.8,0.4,0,7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x+4.6,hy-2.6,1.8,2.8,-0.4,0,7); ctx.fill();
   }
+  if(o.hat){ ctx.fillStyle=o.hat;
+    ctx.beginPath(); ctx.arc(x,hy-2,6.6,Math.PI,2*Math.PI); ctx.fill();
+    ctx.fillRect(x-7.6,hy-2.6,15.2,2); }
+  // Gesicht
+  ctx.fillStyle="#232a30";
+  ctx.beginPath(); ctx.arc(x-2.3,hy+0.6,0.95,0,7); ctx.fill();
+  ctx.beginPath(); ctx.arc(x+2.3,hy+0.6,0.95,0,7); ctx.fill();
+  ctx.strokeStyle="rgba(35,42,48,.75)"; ctx.lineWidth=0.9;
+  ctx.beginPath(); ctx.arc(x,hy+2.6,1.9,0.25*Math.PI,0.75*Math.PI); ctx.stroke();
+  ctx.fillStyle="rgba(235,120,110,.30)";
+  ctx.beginPath(); ctx.arc(x-3.8,hy+2.2,1.2,0,7); ctx.fill();
+  ctx.beginPath(); ctx.arc(x+3.8,hy+2.2,1.2,0,7); ctx.fill();
+  ctx.fillStyle="rgba(255,255,255,.35)";
+  ctx.beginPath(); ctx.arc(x-2.2,hy-2.8,1.7,0,7); ctx.fill();
 }
 const VIS={ putz:{x:0,y:0,init:false}, auff:{x:0,y:0,carry:false,init:false}, last:0 };
 function moveVis(p,tx,ty,speed,dtv){
@@ -1590,16 +1892,116 @@ function moveVis(p,tx,ty,speed,dtv){
   p.x+=dx/d*st; p.y+=dy/d*st;
   return false;
 }
+/* Pausen-Läufer: laufen vom Arbeitsplatz durch die Personaltüre in den Raum */
+const BW={};
+function walkerFor(k,i){ return BW[k+"_"+i]; }
+function walkerCount(k){ return Object.keys(BW).filter(x=>x.startsWith(k+"_")).length; }
+function roleOnShift(k){
+  if(!S.staff[k]) return false;
+  const h=dayHour(), r=shiftRange(k);
+  if(h<r[0]||h>=r[1]) return false;
+  const b=S.breaks&&S.breaks[k];
+  if(b && b.day===S.day && h<b.until) return false;
+  return true;
+}
+const STAFF_LOOK={kassierer:["#2e6da4","#e8bd90","#4a3220"], auffueller:["#d08a30","#c98a5b","#1e1e1e"],
+                  putz:["#5aa060","#f2c9a0","#7a4a1e"], sicherheit:["#2f3b46","#c98a5b","#1e1e1e"]};
+function seatPos(kind,idx){
+  if(kind==="ruhe" && S.staffRoomLvl>=4){
+    const r=LY.ruhe, nB=r.w>120?3:2;
+    const bx=r.x+14+(idx%nB)*((r.w-28-30)/(nB-1||1));
+    return {x:bx+15, y:r.y+42, badge:"💤"};
+  }
+  const r=LY.staffR;
+  const seats=[{x:r.x+12,y:r.y+52},{x:r.x+48,y:r.y+52},{x:r.x+30,y:r.y+68},
+               {x:r.x+r.w-40,y:r.y+60},{x:r.x+r.w-70,y:r.y+66},{x:r.x+26,y:r.y+34}];
+  const s2=seats[idx%seats.length];
+  return {x:s2.x, y:s2.y-6, badge:"🍽️"};
+}
+function workPos(k,i){
+  if(k==="kassierer"){ const p=LY.kassePos[Math.min(i,S.kassen-1)]||LY.kassePos[0]; return {x:p.x-2,y:p.y-26}; }
+  if(k==="putz") return {x:VIS.putz.x||LY.aisleX, y:VIS.putz.y||LY.hall.y+130};
+  if(k==="auffueller") return {x:VIS.auff.x||LY.aisleX-30, y:VIS.auff.y||LY.hall.y+130};
+  return GUARD.init? {x:GUARD.x,y:GUARD.y} : {x:LY.aisleX+20,y:LY.hall.y+120};
+}
+function buildGoLegs(from,w){
+  const gy2=LY.gang.y+LY.gang.h;
+  const sp=seatPos(w.kind,w.seat);
+  const roomCX=(w.kind==="ruhe")? LY.ruhe.x+LY.ruhe.w/2 : LY.staffR.x+LY.staffR.w/2;
+  const legs=[];
+  if(from.y>LY.hall.y+56) legs.push({x:LY.aisleX, y:LY.hall.y+46});
+  if(from.y>gy2+18)       legs.push({x:LY.aisleX, y:gy2+14});     // vor die Personaltüre
+  legs.push({x:LY.aisleX, y:gy2-16});                             // durch die Türe in den Gang
+  legs.push({x:roomCX,    y:gy2-16});                             // im Gang zur Raumtüre
+  legs.push({x:sp.x, y:sp.y});                                    // an den Platz
+  return legs;
+}
+function buildBackLegs(from,k,i){
+  const gy2=LY.gang.y+LY.gang.h;
+  const wp=workPos(k,i);
+  const legs=[];
+  if(from.y<gy2-6){
+    legs.push({x:from.x, y:gy2-16});
+    legs.push({x:LY.aisleX, y:gy2-16});
+  }
+  legs.push({x:LY.aisleX, y:gy2+14});
+  if(wp.y>LY.hall.y+56) legs.push({x:LY.aisleX, y:LY.hall.y+46});
+  legs.push({x:wp.x, y:wp.y});
+  return legs;
+}
+function drawBreakWalkers(now,dtv){
+  let seat=0;
+  ["kassierer","auffueller","putz","sicherheit"].forEach(k=>{
+    const n=S.staff[k]||0;
+    const roleBreak=onBreak(k);
+    for(let i=0;i<n;i++){
+      const key=k+"_"+i;
+      const away=(roleBreak==="pause") || empAtLunch(k,i);
+      const kind=(roleBreak==="pause" && S.staffRoomLvl>=4)? "ruhe" : "staffR";
+      let w=BW[key];
+      if(away && !w){
+        const wp=workPos(k,i);
+        w=BW[key]={x:wp.x, y:wp.y, ph:"go", seat:seat, kind};
+        w.legs=buildGoLegs(wp,w); w.li=0;
+      }
+      if(!w){ if(away) seat++; continue; }
+      if(away) seat++;
+      // Richtungswechsel sauber behandeln
+      if(!away && (w.ph==="go"||w.ph==="sit")){ w.ph="back"; w.legs=buildBackLegs(w,k,i); w.li=0; }
+      else if(away && w.ph==="back"){ w.ph="go"; w.legs=buildGoLegs(w,w); w.li=0; }
+      let moving=false, gone=false;
+      if(w.ph!=="sit"){
+        const t=w.legs[w.li];
+        if(moveVis(w,t.x,t.y,54,dtv)){
+          w.li++;
+          if(w.li>=w.legs.length){
+            if(w.ph==="go") w.ph="sit";
+            else{ delete BW[key]; gone=true; }
+          }else moving=true;
+        }else moving=true;
+      }
+      if(gone) continue;
+      const lk=STAFF_LOOK[k];
+      drawPerson(w.x,w.y,lk[0],lk[1],lk[2],{phase:moving?now*9+i:undefined, look:i%4});
+      if(w.ph==="sit"){
+        const sp=seatPos(w.kind,w.seat);
+        BB(w.x,w.y,()=>{ ctx.font="10px -apple-system,sans-serif"; ctx.fillText(sp.badge, 10, -16); });
+      }
+    }
+  });
+}
 function drawStaff(now,dtv){
+  drawBreakWalkers(now,dtv);
   if(!VIS.putz.init){ VIS.putz={x:LY.aisleX+20,y:LY.hall.y+130,init:true}; }
   if(!VIS.auff.init){ VIS.auff={x:LY.aisleX-30,y:LY.hall.y+130,carry:false,init:true}; }
-  if(staffOn("kassierer")>0){
-    for(let i=0;i<Math.min(S.kassen,staffOn("kassierer"));i++){
+  if(roleOnShift("kassierer")){
+    for(let i=0;i<Math.min(S.kassen,S.staff.kassierer);i++){
+      if(walkerFor("kassierer",i) || empAtLunch("kassierer",i)) continue;
       const p=LY.kassePos[i];
-      drawPerson(p.x-2,p.y-26,"#2e6da4","#e8bd90","#4a3220",{apron:"#ff9d3f"});
+      drawPerson(p.x-2,p.y-26,"#2e6da4","#e8bd90","#4a3220",{apron:"#ff9d3f", look:i%4});
     }
   }
-  if(staffOn("putz")>0){
+  if(staffOn("putz")>0 && walkerCount("putz")<S.staff.putz){
     const tgt=dirt[0]||odirt[0];
     let moving=false;
     if(tgt){ moving=!moveVis(VIS.putz,tgt.x,tgt.y-8,46,dtv); }
@@ -1607,12 +2009,13 @@ function drawStaff(now,dtv){
     drawPerson(VIS.putz.x,VIS.putz.y,"#5aa060","#f2c9a0","#7a4a1e",{apron:"#d9e2e8",phase:moving?now*9:undefined});
     BB(VIS.putz.x+9,VIS.putz.y,()=>{ ctx.font="11px -apple-system,sans-serif"; ctx.textAlign="center"; ctx.fillText("🧹",0,2); });
   }
-  if(staffOn("auffueller")>0){
+  if(staffOn("auffueller")>0 && walkerCount("auffueller")<S.staff.auffueller){
     let bestS=null, worst=1;
     activeSlots().forEach(s=>{
+      const cap=shelfCap(s.id);
       shelfData(s.id).parts.forEach(pt=>{
-        if(pt.prod && pt.units<shelfCap() && (S.lager[pt.prod]||0)>0 && pt.units/shelfCap()<worst){
-          worst=pt.units/shelfCap(); bestS=s;
+        if(pt.prod && pt.units<cap && (S.lager[pt.prod]||0)>0 && pt.units/cap<worst){
+          worst=pt.units/cap; bestS=s;
         }
       });
     });
@@ -1849,15 +2252,16 @@ function render(){
   }
 
   /* ===== BODEN-PASS (Welt-Transform) ===== */
+  const EXT=WW+WH;   // Boden reicht in jeder Zoomstufe bis über den Bildrand
   isoWorld(()=>{
-    ctx.fillStyle=TEX.grass; ctx.fillRect(-260,-260,WW+520,WH+520);
-    ctx.fillStyle=TEX.plaza; ctx.fillRect(0, LY.plazaTop, WW, LY.roadY-LY.plazaTop);
-    ctx.fillStyle="rgba(0,0,0,.06)"; ctx.fillRect(0,LY.plazaTop,WW,3);
-    ctx.fillStyle=TEX.asphalt; ctx.fillRect(-120,LY.roadY,WW+240,50);
-    ctx.fillStyle="rgba(0,0,0,.10)"; ctx.fillRect(-120,LY.roadY,WW+240,50);
-    ctx.fillStyle="#b8bcc2"; ctx.fillRect(-120,LY.roadY-4,WW+240,4);
+    ctx.fillStyle=TEX.grass; ctx.fillRect(-EXT,-EXT,WW+2*EXT,WH+2*EXT);
+    ctx.fillStyle=TEX.plaza; ctx.fillRect(-EXT, LY.plazaTop, WW+2*EXT, LY.roadY-LY.plazaTop);
+    ctx.fillStyle="rgba(0,0,0,.06)"; ctx.fillRect(-EXT,LY.plazaTop,WW+2*EXT,3);
+    ctx.fillStyle=TEX.asphalt; ctx.fillRect(-EXT,LY.roadY,WW+2*EXT,50);
+    ctx.fillStyle="rgba(0,0,0,.10)"; ctx.fillRect(-EXT,LY.roadY,WW+2*EXT,50);
+    ctx.fillStyle="#b8bcc2"; ctx.fillRect(-EXT,LY.roadY-4,WW+2*EXT,4);
     ctx.strokeStyle="rgba(255,255,255,.7)"; ctx.lineWidth=2.5; ctx.setLineDash([14,12]);
-    ctx.beginPath(); ctx.moveTo(-120,LY.roadY+25); ctx.lineTo(WW+120,LY.roadY+25); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-EXT,LY.roadY+25); ctx.lineTo(WW+EXT,LY.roadY+25); ctx.stroke();
     ctx.setLineDash([]);
     ctx.fillStyle="rgba(255,255,255,.85)";
     for(let k=0;k<6;k++) ctx.fillRect(LY.door.x-30, LY.roadY+5+k*8, 60, 4);
@@ -1865,9 +2269,9 @@ function render(){
     ctx.strokeStyle="rgba(0,0,0,.35)"; ctx.lineWidth=1.5;
     ctx.beginPath(); ctx.arc(LY.door.x+120,LY.roadY+38,7,0,7); ctx.stroke();
     // Parkplatz
-    ctx.fillStyle=TEX.asphalt; ctx.fillRect(-120,LY.parkTop,WW+240,WH-LY.parkTop+120);
-    ctx.fillStyle="rgba(0,0,0,.05)"; ctx.fillRect(-120,LY.parkTop,WW+240,WH-LY.parkTop+120);
-    ctx.fillStyle="#b8bcc2"; ctx.fillRect(-120,LY.parkTop-4,WW+240,4);
+    ctx.fillStyle=TEX.asphalt; ctx.fillRect(-EXT,LY.parkTop,WW+2*EXT,WH-LY.parkTop+EXT);
+    ctx.fillStyle="rgba(0,0,0,.05)"; ctx.fillRect(-EXT,LY.parkTop,WW+2*EXT,WH-LY.parkTop+EXT);
+    ctx.fillStyle="#b8bcc2"; ctx.fillRect(-EXT,LY.parkTop-4,WW+2*EXT,4);
     for(let i=0;i<LY.spaces.length;i++){
       const p=LY.spaces[i];
       if(i<S.parking){ ctx.strokeStyle="rgba(255,255,255,.6)"; ctx.lineWidth=2; ctx.strokeRect(p.x-20,p.y-2,40,30); }
@@ -1917,11 +2321,6 @@ function render(){
     if(LY.backR&&LY.back.hasBR) aoRect(LY.backR.x,LY.backR.y+T,LY.backR.w,LY.backR.h-T);
     aoRect(LY.gang.x,LY.gang.y+T,LY.gang.w,LY.gang.h-T);
     [LY.lager,LY.staffR,LY.ruhe,LY.tech].forEach(r=>aoRect(r.x,r.y+T,r.w,r.h-T));
-    // Sauberkeits-Balken Personalraum
-    const srr=LY.staffR;
-    ctx.fillStyle="rgba(0,0,0,.22)"; ctx.fillRect(srr.x+10,srr.y+srr.h-14,srr.w-20,5);
-    ctx.fillStyle= S.staffRoom>=30?"#1f8a4d":"#d33a2f";
-    ctx.fillRect(srr.x+10,srr.y+srr.h-14,(srr.w-20)*S.staffRoom/100,5);
     // Dreck innen
     dirt.forEach(dd=>{
       ctx.fillStyle="rgba(120,95,60,.45)";
@@ -2059,30 +2458,106 @@ function render(){
   // Lager-Regale
   {
     const r=LY.lager, nRk=Math.max(2, Math.floor((r.w-30)/48));
-    for(let k=0;k<nRk;k++){
-      const rx=r.x+16+k*48;
-      D(rx+r.y+50,()=>{ isoBox(rx,r.y+26,34,14,22,"#9a7a48","#8a6a3a");
-        [[9,-16],[25,-16],[25,-6],[9,-6]].forEach(([ox,oh],ii)=>{
-          const q=PJ(rx+ox,r.y+40,22+oh+8);
-          ctx.font="9px -apple-system,sans-serif"; ctx.fillText(ii%3===1?"🥫":"📦", q.x, q.y);
+    for(let row=0;row<2;row++){
+      const ry=r.y+22+row*42;
+      for(let k=0;k<nRk;k++){
+        const rx=r.x+16+k*48;
+        D(rx+ry+24,()=>{ isoBox(rx,ry,34,14,22,"#9a7a48","#8a6a3a");
+          [[9,-16],[25,-16],[25,-6],[9,-6]].forEach(([ox,oh],ii)=>{
+            const q=PJ(rx+ox,ry+14,22+oh+8);
+            ctx.font="9px -apple-system,sans-serif";
+            ctx.fillText((ii+row)%3===1?"🥫":"📦", q.x, q.y);
+          });
+        });
+      }
+    }
+    // Palette mit Hubwagen-Platz
+    D(r.x+r.w-26+r.y+r.h,()=>{ isoBox(r.x+r.w-40,r.y+r.h-26,28,16,6,"#c9a86a","#b08c50"); });
+  }
+  // Personalraum: richtige Möbel je Ausbaustufe
+  {
+    const r=LY.staffR;
+    // Lv1: Küchenzeile mit Kaffeemaschine & Kühlschrank
+    D(r.x+34+r.y+30,()=>{
+      isoBox(r.x+10,r.y+18,48,13,15,"#d9dde1",(W,H)=>{
+        ctx.fillStyle=vg2(H,"#d4d8dc","#b8bec4"); ctx.fillRect(0,0,W,H);
+        ctx.fillStyle="rgba(0,0,0,.15)"; ctx.fillRect(0,H*0.55,W,1.5);
+      });
+      isoWorld(()=>{ ctx.fillStyle="#2b333a"; ctx.fillRect(r.x+14,r.y+20,12,8);
+        ctx.fillStyle="#e8632a"; ctx.fillRect(r.x+15,r.y+21,10,2.5); },15);
+      const q=PJ(r.x+40,r.y+24,20);
+      ctx.font="10px -apple-system,sans-serif"; ctx.fillText("☕", q.x, q.y);
+    });
+    D(r.x+r.w-18+r.y+28,()=>{
+      isoBox(r.x+r.w-28,r.y+16,18,12,26,"#f2f4f6",(W,H)=>{
+        ctx.fillStyle=vg2(H,"#f4f6f8","#d9dee3"); ctx.fillRect(0,0,W,H);
+        ctx.fillStyle="#9aa5ad"; ctx.fillRect(W-4,4,1.8,10);
+        ctx.fillStyle="rgba(0,0,0,.12)"; ctx.fillRect(0,H*0.45,W,1.5);
+      });
+    });
+    // Lv1: runder Tisch & Stühle
+    D(r.x+32+r.y+56,()=>{
+      const q=PJ(r.x+30,r.y+52,0);
+      isoWorld(()=>{ ctx.fillStyle="rgba(0,0,0,.15)";
+        ctx.beginPath(); ctx.ellipse(r.x+30,r.y+52,15,11,0,0,7); ctx.fill(); });
+      ctx.fillStyle="#7a5a34"; ctx.fillRect(q.x-1.5,q.y-12,3,12);
+      isoWorld(()=>{ ctx.fillStyle="#a07c48";
+        ctx.beginPath(); ctx.ellipse(r.x+30,r.y+52,14,10,0,0,7); ctx.fill();
+        ctx.fillStyle="rgba(255,255,255,.22)";
+        ctx.beginPath(); ctx.ellipse(r.x+27,r.y+49,6,4,0,0,7); ctx.fill(); },12);
+      [[r.x+12,r.y+52],[r.x+48,r.y+52],[r.x+30,r.y+68]].forEach(([sx,sy])=>{
+        const qs=PJ(sx,sy,0);
+        ctx.fillStyle="#5f6b74"; ctx.beginPath(); ctx.ellipse(qs.x,qs.y-5,5,3.5,0,0,7); ctx.fill();
+        ctx.fillStyle="#4a555e"; ctx.fillRect(qs.x-4.5,qs.y-5,9,4);
+      });
+    });
+    if(S.staffRoomLvl>=2){
+      // Lv2: Sofa mit Lehne, Kissen & Teppich + Beistelltisch
+      isoWorld(()=>{ ctx.fillStyle="rgba(180,90,80,.20)";
+        ctx.beginPath(); ctx.ellipse(r.x+r.w-42,r.y+62,30,17,0,0,7); ctx.fill(); });
+      D(r.x+r.w-40+r.y+62,()=>{
+        isoBox(r.x+r.w-64,r.y+48,48,7,17,"#3a6a99","#345f8a");                 // Rückenlehne
+        isoBox(r.x+r.w-64,r.y+55,7,14,11,"#3a6a99","#345f8a");                 // Armlehnen
+        isoBox(r.x+r.w-23,r.y+55,7,14,11,"#3a6a99","#345f8a");
+        isoWorld(()=>{ ctx.fillStyle="#4a7fb5"; ctx.fillRect(r.x+r.w-57,r.y+55,34,13);
+          ctx.fillStyle="#5d92c6"; ctx.fillRect(r.x+r.w-57,r.y+55,16,13);
+          ctx.fillStyle="rgba(255,255,255,.18)"; ctx.fillRect(r.x+r.w-57,r.y+55,34,3); },9);
+        const q=PJ(r.x+r.w-40,r.y+52,20);
+        ctx.font="9px -apple-system,sans-serif"; ctx.fillText("🛋️", q.x, q.y);
+      });
+      D(r.x+r.w-74+r.y+66,()=>{ isoBox(r.x+r.w-80,r.y+62,12,9,9,"#a07c48","#8a6a3a"); });
+    }
+    if(S.staffRoomLvl>=3){
+      // Lv3: Wand-TV, Pflanzen & Wasserspender
+      D(r.x+70+r.y+16,()=>{
+        const q=PJ(r.x+72,r.y+13,26);
+        ctx.fillStyle="#1d232a"; ctx.fillRect(q.x-17,q.y-11,34,20);
+        ctx.fillStyle=`rgb(${40+20*Math.sin(now*2)},${120+30*Math.sin(now*1.3)},212)`;
+        ctx.fillRect(q.x-15,q.y-9,30,16);
+        ctx.fillStyle="rgba(255,255,255,.35)";
+        ctx.beginPath(); ctx.moveTo(q.x-13,q.y+7); ctx.lineTo(q.x-6,q.y-9); ctx.lineTo(q.x-2,q.y-9); ctx.lineTo(q.x-9,q.y+7); ctx.closePath(); ctx.fill();
+      });
+      [[r.x+8,r.y+70],[r.x+r.w-8,r.y+20]].forEach(([px2,py2])=>{
+        D(px2+py2+4,()=>{
+          isoBox(px2-4,py2-3,8,6,7,"#b0603a","#9a5230");
+          const q=PJ(px2,py2,10);
+          ctx.font="12px -apple-system,sans-serif"; ctx.fillText("🪴", q.x, q.y);
+        });
+      });
+      D(r.x+66+r.y+72,()=>{
+        isoBox(r.x+62,r.y+68,9,7,20,"#dfe6ea",(W,H)=>{
+          ctx.fillStyle=vg2(H,"#eef2f5","#c9d2d8"); ctx.fillRect(0,0,W,H);
+          ctx.fillStyle="rgba(90,160,220,.7)"; ctx.fillRect(1.5,2,W-3,7);
         });
       });
     }
-  }
-  // Personalraum
-  {
-    const r=LY.staffR;
-    D(r.x+30+r.y+40,()=>{
-      isoBox(r.x+12,r.y+22,42,12,14,"#d4d8dc","#c9cdd2");
-      const q=PJ(r.x+30,r.y+28,22); ctx.font="10px -apple-system,sans-serif"; ctx.fillText("☕",q.x,q.y);
-    });
-    D(r.x+32+r.y+56,()=>{ isoBox(r.x+22,r.y+48,22,14,11,"#9a7a48","#8a6a3a"); });
-    if(S.staffRoomLvl>=2) D(r.x+r.w-32+r.y+58,()=>{ isoBox(r.x+r.w-56,r.y+44,44,16,14,"#5d92c6","#4a7fb5"); });
-    if(S.staffRoomLvl>=3) D(r.x+r.w-30+r.y+30,()=>{
-      isoBox(r.x+r.w-50,r.y+20,36,6,18,"#20262d",(W,H)=>{ ctx.fillStyle="#1d232a"; ctx.fillRect(0,0,W,H);
-        ctx.fillStyle="#3a7fd4"; ctx.fillRect(2,3,W-4,H-7); });
-      const q=PJ(r.x+62,r.y+26,4); ctx.font="9px -apple-system,sans-serif"; ctx.fillText("🪴",q.x,q.y);
-    });
+    // Garderoben-Spinde entlang der Südwand
+    for(let lx=r.x+12; lx<r.x+r.w-24; lx+=17){
+      D(lx+r.y+r.h-6,()=>{ isoBox(lx,r.y+r.h-24,13,8,20,"#7c8f9c","#6f8290",(W,H)=>{
+        ctx.fillStyle="#65788a"; ctx.fillRect(0,0,W,H);
+        ctx.fillStyle="rgba(255,255,255,.3)"; ctx.fillRect(2,4,W-4,1.5);
+      }); });
+    }
   }
   // Ruheraum
   {
@@ -2284,6 +2759,7 @@ function render(){
     const firstProd=(d.parts.find(pt=>pt.prod)||{}).prod;
     const st=DEPT_STYLE[s.zone==="hall"? (firstProd?P[firstProd].dept:"food") : s.zone]||DEPT_STYLE.food;
     const X=s.x-45, Y=s.y-16, Wd=90, Dp=26, Hh=32;
+    const CAP=shelfCap(s.id), SLV=shelfData(s.id).lvl||1;
     gshadow(X,Y+4,Wd,Dp,0.22);
     D(s.x+s.y+12, ()=>{
       faceE(X+Wd,Y,Dp,Hh,(W,H)=>{ ctx.fillStyle=vg2(H, shade(st.frame,0.72), shade(st.frame,0.5)); ctx.fillRect(0,0,W,H); });
@@ -2296,9 +2772,39 @@ function render(){
           ctx.beginPath(); ctx.moveTo(W*0.3,3); ctx.lineTo(W*0.42,H-5); ctx.lineTo(W*0.48,H-5); ctx.lineTo(W*0.36,3); ctx.closePath(); ctx.fill(); }
         const nP=d.parts.length;
         for(let k=1;k<nP;k++){ ctx.fillStyle=shade(st.frame,0.75); ctx.fillRect(4+(W-8)*k/nP-1,3,2.5,H-8); }
+        // Füllbalken pro Platz – auf einen Blick sichtbar
+        d.parts.forEach((pt,k)=>{
+          if(!pt.prod) return;
+          const bw=(W-8)/nP-8, bx=4+(W-8)*k/nP+4;
+          const ratio=pt.units/CAP;
+          ctx.fillStyle="rgba(0,0,0,.35)"; ctx.fillRect(bx,H-7,bw,4.5);
+          ctx.fillStyle= ratio===0?"#d33a2f": ratio<0.3?"#e8a13a":"#39c46e";
+          ctx.fillRect(bx,H-7,bw*ratio,4.5);
+        });
       });
-      isoWorld(()=>{ ctx.fillStyle=shade(st.frame,1.02); ctx.fillRect(X,Y,Wd,Dp);
-        ctx.fillStyle="rgba(255,255,255,.2)"; ctx.fillRect(X,Y,Wd,3); },Hh);
+      isoWorld(()=>{ ctx.fillStyle=shade(st.frame, SLV>=4? 0.55 : 1.02); ctx.fillRect(X,Y,Wd,Dp);
+        ctx.fillStyle="rgba(255,255,255,.2)"; ctx.fillRect(X,Y,Wd,3);
+        if(SLV>=2){ ctx.fillStyle="rgba(230,238,244,.85)"; ctx.fillRect(X,Y,Wd,2); ctx.fillRect(X,Y+Dp-2,Wd,2); }
+        if(SLV>=5){ ctx.fillStyle="#d4a017"; ctx.fillRect(X,Y,Wd,2.2); ctx.fillRect(X,Y+Dp-2.2,Wd,2.2); }
+      },Hh);
+      if(SLV>=3){
+        faceS(X,Y+Dp,Wd,Hh,(W,H)=>{           // LED-Leiste an der Frontoberkante
+          ctx.fillStyle=`rgba(120,220,255,${0.5+0.2*Math.sin(now*3)})`;
+          ctx.fillRect(4,1,W-8,2.2);
+        });
+      }
+      if(SLV>=4){
+        isoWorld(()=>{ ctx.fillStyle="rgba(200,230,245,.30)"; ctx.fillRect(X+4,Y+3,Wd-8,Dp-6);
+          ctx.strokeStyle="rgba(255,255,255,.5)"; ctx.lineWidth=1; ctx.strokeRect(X+4,Y+3,Wd-8,Dp-6); },Hh+7);
+      }
+      if(SLV>=5){
+        faceS(X,Y+Dp,Wd,Hh,(W,H)=>{
+          const gx=((now*30)%(W+40))-20;
+          ctx.fillStyle="rgba(255,215,80,.28)"; ctx.fillRect(gx,H-4,22,3);
+        });
+        const qb=PJ(X+Wd-6,Y+3,Hh+10);
+        ctx.font="9px -apple-system,sans-serif"; ctx.fillText("⭐", qb.x, qb.y);
+      }
       // Produkte: Billboards auf zwei Ebenen entlang der Front
       const parts=d.parts, nP=parts.length;
       const anyProd=parts.some(pt=>pt.prod);
@@ -2314,7 +2820,7 @@ function render(){
           }
           const p=P[pt.prod];
           const perR=nP===1? 4 : nP===2? 2 : 1;
-          const fill=pt.units/shelfCap();
+          const fill=pt.units/CAP;
           const icons=Math.min(perR*2, Math.ceil(fill*perR*2));
           ctx.font=(nP===1?"11px":"10px")+" -apple-system,sans-serif";
           for(let ic=0;ic<icons;ic++){
@@ -2323,16 +2829,21 @@ function render(){
             const q=PJ(px2, Y+Dp, Hh-9-row*13);
             ctx.fillText(p.emoji, q.x, q.y);
           }
-          // Preisschild-Billboard
+          // Preisschild-Billboard mit Stückzahl (Premium in Gold)
           const q2=PJ(cxm, Y+Dp, 0);
           const liq=isLiq(pt.prod), promo=isPromo(pt.prod);
-          ctx.fillStyle="#fff"; rr(q2.x-13,q2.y+2,26,10,3); ctx.fill();
-          ctx.strokeStyle="rgba(0,0,0,.15)"; ctx.lineWidth=1; rr(q2.x-13,q2.y+2,26,10,3); ctx.stroke();
-          ctx.fillStyle= pt.units===0?"#d33a2f": pt.units<shelfCap()*0.3?"#e8a13a":"#1f8a4d";
-          ctx.beginPath(); ctx.arc(q2.x-9,q2.y+7,2,0,7); ctx.fill();
+          const plv=prodLvl(pt.prod);
+          ctx.fillStyle= plv>=3? "#fff3c8" : "#fff";
+          rr(q2.x-17,q2.y+2,34,10,3); ctx.fill();
+          ctx.strokeStyle= plv>=2? "#d4a017" : "rgba(0,0,0,.15)"; ctx.lineWidth= plv>=2?1.4:1;
+          rr(q2.x-17,q2.y+2,34,10,3); ctx.stroke();
+          ctx.fillStyle= pt.units===0?"#d33a2f": pt.units<CAP*0.3?"#e8a13a":"#1f8a4d";
+          ctx.font="800 6.5px -apple-system,sans-serif"; ctx.textAlign="left";
+          ctx.fillText(""+pt.units, q2.x-14, q2.y+9.5);
+          ctx.textAlign="center";
           ctx.fillStyle= liq? "#e07800" : promo? "#b40000" : "#c22a20";
           ctx.font="800 7px -apple-system,sans-serif";
-          ctx.fillText(vkEff(pt.prod).toFixed(2), q2.x+3, q2.y+9.5);
+          ctx.fillText(vkEff(pt.prod).toFixed(2), q2.x+6, q2.y+9.5);
           if(p.season===season() && k===0){
             const q3=PJ(X+8,Y+4,Hh+6);
             ctx.font="9px -apple-system,sans-serif"; ctx.fillText(SEASON_EMOJI[season()], q3.x, q3.y);
@@ -2369,25 +2880,25 @@ function render(){
     const p=LY.kassePos[i];
     if(i>=S.kassen){
       isoWorld(()=>{ ctx.setLineDash([5,4]); ctx.strokeStyle="rgba(0,0,0,.18)"; ctx.lineWidth=1.5;
-        ctx.strokeRect(p.x-30,p.y-13,60,26); ctx.setLineDash([]); });
+        ctx.strokeRect(p.x-26,p.y-13,52,26); ctx.setLineDash([]); });
       continue;
     }
-    gshadow(p.x-30,p.y-10,60,24,0.22);
+    gshadow(p.x-26,p.y-10,52,24,0.22);
     D(p.x+p.y+14,()=>{
-      isoBox(p.x-30,p.y-13,60,26,22,"#7e909d",(W,H)=>{
+      isoBox(p.x-26,p.y-13,52,26,22,"#7e909d",(W,H)=>{
         ctx.fillStyle=vg2(H,"#83959f","#57666f"); ctx.fillRect(0,0,W,H);
         ctx.fillStyle="rgba(255,255,255,.2)"; ctx.fillRect(0,0,W,2.5); });
       // Laufband auf dem Deckel
       isoWorld(()=>{
-        ctx.fillStyle="#2f373e"; ctx.fillRect(p.x-25,p.y-9,36,18);
+        ctx.fillStyle="#2f373e"; ctx.fillRect(p.x-21,p.y-9,30,18);
         ctx.strokeStyle="rgba(255,255,255,.25)"; ctx.lineWidth=1.5;
         const off=(now*18)%8;
-        for(let k=0;k<5;k++){
-          const lx=p.x-23+((k*8+off)%34);
+        for(let k=0;k<4;k++){
+          const lx=p.x-19+((k*8+off)%28);
           ctx.beginPath(); ctx.moveTo(lx,p.y-8); ctx.lineTo(lx,p.y+8); ctx.stroke();
         }
-        ctx.fillStyle="#31404c"; ctx.fillRect(p.x+14,p.y-10,13,12);
-        ctx.fillStyle="#8fe3d0"; ctx.fillRect(p.x+16,p.y-8,9,5);
+        ctx.fillStyle="#31404c"; ctx.fillRect(p.x+11,p.y-10,12,12);
+        ctx.fillStyle="#8fe3d0"; ctx.fillRect(p.x+13,p.y-8,8,5);
       },22);
       // Nummern-Pfosten
       const q=PJ(p.x+24,p.y-10,22);
@@ -2455,7 +2966,7 @@ function render(){
   }
 
   /* ===== PERSONEN & EFFEKTE ===== */
-  if(staffOn("sicherheit")>0 && GUARD.init){
+  if(staffOn("sicherheit")>0 && walkerCount("sicherheit")<S.staff.sicherheit && GUARD.init){
     drawPerson(GUARD.x,GUARD.y,"#2f3b46","#c98a5b","#1e1e1e",
       {hat:"#2f3b46",vest:"#ffd23f",phase: GUARD.state!=="post"? now*10 : undefined});
     BB(GUARD.x,GUARD.y,()=>{ ctx.font="9px -apple-system,sans-serif";
@@ -2464,7 +2975,7 @@ function render(){
   drawStaff(now,dtv);
   customers.forEach(c=>{
     drawPerson(c.x,c.y, c.thief?"#d33a2f":c.shirt, c.skin, c.hair,
-      {phase: c.path.length? now*9+(c.po||0) : undefined});
+      {phase: c.path.length? now*9+(c.po||0) : undefined, look: Math.abs(Math.floor((c.po||0)*7))%4});
     if(c.carry.length){
       BB(c.x,c.y,()=>{ ctx.font="10px -apple-system,sans-serif";
         ctx.fillText(P[c.carry[c.carry.length-1].prod].emoji, 10, -2); });
@@ -2524,11 +3035,12 @@ function render(){
     isoWorld(()=>{
       const bbX=LY.gang.x-10, bbX2=LY.gang.x+LY.gang.w+10;
       const bbY=LY.srY-10, bbY2=LY.hall.y+LY.hall.h+14;
+      const E2=WW+WH;
       ctx.fillStyle=`rgba(10,14,42,${dark*0.55})`;
-      ctx.fillRect(-260,-260,WW+520,bbY+260);
-      ctx.fillRect(-260,bbY,bbX+260,bbY2-bbY);
-      ctx.fillRect(bbX2,bbY,WW+260-bbX2,bbY2-bbY);
-      ctx.fillRect(-260,bbY2,WW+520,WH+260-bbY2);
+      ctx.fillRect(-E2,-E2,WW+2*E2,bbY+E2);
+      ctx.fillRect(-E2,bbY,bbX+E2,bbY2-bbY);
+      ctx.fillRect(bbX2,bbY,WW+E2-bbX2,bbY2-bbY);
+      ctx.fillRect(-E2,bbY2,WW+2*E2,WH+E2-bbY2);
     });
     function glow(wx,wy,r,col){
       const q=PJ(wx,wy,0);
@@ -2554,12 +3066,44 @@ function render(){
 
 /* ================= EINGABE (Wischen + Tippen) ================= */
 const PTR={down:false, sx:0, sy:0, cx0:0, cy0:0, dragged:false, hinted:false};
-cv.addEventListener("pointerdown", ev=>{
-  PTR.down=true; PTR.dragged=false;
+const PTRS=new Map();
+const PINCH={on:false, d0:0, sc0:1, aw:{x:0,y:0}};
+function ptrMid(){
+  const a=[...PTRS.values()];
+  return {x:(a[0].x+a[1].x)/2, y:(a[0].y+a[1].y)/2,
+          d:Math.hypot(a[0].x-a[1].x, a[0].y-a[1].y)};
+}
+function panBaseline(ev){
   PTR.sx=ev.clientX; PTR.sy=ev.clientY;
   PTR.cx0=cam.x; PTR.cy0=cam.y;
+}
+cv.addEventListener("pointerdown", ev=>{
+  PTRS.set(ev.pointerId,{x:ev.clientX,y:ev.clientY});
+  if(PTRS.size===1){
+    PTR.down=true; PTR.dragged=false;
+    panBaseline(ev);
+  }else if(PTRS.size===2){
+    const r=cv.getBoundingClientRect();
+    const m=ptrMid();
+    PINCH.on=true; PINCH.d0=Math.max(20,m.d); PINCH.sc0=sc;
+    PINCH.aw={x:cam.x+(m.x-r.left)/sc, y:cam.y+(m.y-r.top)/sc};
+    PTR.dragged=true;
+    if(!PTR.hinted){ PTR.hinted=true; $("panHint").style.opacity=0; }
+  }
 });
 cv.addEventListener("pointermove", ev=>{
+  if(!PTRS.has(ev.pointerId)) return;
+  PTRS.set(ev.pointerId,{x:ev.clientX,y:ev.clientY});
+  if(PINCH.on && PTRS.size>=2){
+    const r=cv.getBoundingClientRect();
+    const m=ptrMid();
+    sc=Math.max(fitScale(), Math.min(maxScale(), PINCH.sc0*m.d/PINCH.d0));
+    userSc=sc; zoomFit=false; $("zoomBtn").textContent="🗺️";
+    cam.x=PINCH.aw.x-(m.x-r.left)/sc;
+    cam.y=PINCH.aw.y-(m.y-r.top)/sc;
+    clampCam();
+    return;
+  }
   if(!PTR.down) return;
   const dx=ev.clientX-PTR.sx, dy=ev.clientY-PTR.sy;
   if(Math.hypot(dx,dy)>8){
@@ -2571,14 +3115,36 @@ cv.addEventListener("pointermove", ev=>{
     clampCam();
   }
 });
-window.addEventListener("pointerup", ev=>{
-  if(!PTR.down) return;
-  PTR.down=false;
-  if(PTR.dragged) return;
+function ptrEnd(ev){
+  const wasPinch=PINCH.on;
+  PTRS.delete(ev.pointerId);
+  if(PTRS.size<2) PINCH.on=false;
+  if(PTRS.size===1){
+    const rest=[...PTRS.values()][0];
+    PTR.down=true; PTR.dragged=true;
+    PTR.sx=rest.x; PTR.sy=rest.y; PTR.cx0=cam.x; PTR.cy0=cam.y;
+    return;
+  }
+  if(PTRS.size===0){
+    const wasDown=PTR.down; PTR.down=false;
+    if(!wasDown || PTR.dragged || wasPinch) return;
+    const r=cv.getBoundingClientRect();
+    const w=UNPJ((ev.clientX-r.left)/sc+cam.x, (ev.clientY-r.top)/sc+cam.y);
+    handleTap(w.x, w.y);
+  }
+}
+window.addEventListener("pointerup", ptrEnd);
+window.addEventListener("pointercancel", ptrEnd);
+cv.addEventListener("wheel", ev=>{
+  ev.preventDefault();
   const r=cv.getBoundingClientRect();
-  const w=UNPJ((ev.clientX-r.left)/sc+cam.x, (ev.clientY-r.top)/sc+cam.y);
-  handleTap(w.x, w.y);
-});
+  const mx=ev.clientX-r.left, my=ev.clientY-r.top;
+  const aw={x:cam.x+mx/sc, y:cam.y+my/sc};
+  sc=Math.max(fitScale(), Math.min(maxScale(), sc*(ev.deltaY<0? 1.12:0.89)));
+  userSc=sc; zoomFit=false; $("zoomBtn").textContent="🗺️";
+  cam.x=aw.x-mx/sc; cam.y=aw.y-my/sc;
+  clampCam();
+},{passive:false});
 function handleTap(x,y){
   // Diebe fangen – überall, solange sie sichtbar sind!
   for(const c of customers){
@@ -2807,17 +3373,18 @@ function renderSortiment(){
       <small>Gestern: ${st.yesterday}× · Total: ${st.total}× verkauft</small></div>
       <button class="btn danger" onclick="dropProduct('${id}')">Rauswerfen</button>
     </div>`;
-    const adj=(S.priceAdj[id]||0);
+    const lvl=prodLvl(id);
     html+=`<div class="row" style="padding-top:2px">
-      <div class="em" style="font-size:15px">💲</div>
+      <div class="em" style="font-size:15px">${lvl>=3?"⭐":"💲"}</div>
       <div class="info" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <b style="font-size:13px">${fmt(vkOf(id))}</b>
-        ${adj>0?`<span class="tag season">+${adj.toFixed(2)}</span>`:""}
-        <button class="btn sec" style="padding:6px 11px" onclick="adjPrice('${id}',-1)" ${adj<=0?"disabled":""}>−</button>
-        <button class="btn sec" style="padding:6px 11px" onclick="adjPrice('${id}',1)" ${adj>=5?"disabled":""}>＋ ${fmtS(cost(20))}</button>
+        <span class="tag ${lvl>1?"season":""}" title="Qualität">${"★".repeat(lvl)}${"☆".repeat(3-lvl)}</span>
+        ${lvl<3
+          ? `<button class="btn" style="padding:6px 10px" onclick="upgradeProd('${id}')">⭐ Qualität ${fmtS(cost(lvl===1?40:100))}</button>`
+          : '<span class="tag hit">Premium</span>'}
         ${isPromo(id)
           ? '<span class="tag hit">🔥 AKTION heute</span>'
-          : `<button class="btn" style="padding:6px 10px" onclick="setPromo('${id}')">🔥 Aktion ${fmtS(cost(30))}</button>`}
+          : `<button class="btn sec" style="padding:6px 10px" onclick="setPromo('${id}')">🔥 Aktion ${fmtS(cost(30))}</button>`}
       </div>
     </div>`;
   });
@@ -2845,19 +3412,12 @@ window.addProduct=function(id){
   toast(`✅ ${P[id].name} ist neu im Sortiment`);
   renderPanel(); save();
 };
-window.adjPrice=function(id,dir){
-  const cur=S.priceAdj[id]||0;
-  if(dir>0){
-    if(cur>=5){ toast("Maximal +5.– Aufschlag pro Produkt."); return; }
-    if(!pay(cost(20))) return;
-    S.priceAdj[id]=Math.round((cur+0.5)*2)/2;
-    toast(`💲 ${P[id].name}: neuer Preis ${fmt(vkOf(id))}`);
-  }else{
-    if(cur<=0) return;
-    S.priceAdj[id]=Math.round((cur-0.5)*2)/2;
-    if(S.priceAdj[id]===0) delete S.priceAdj[id];
-    toast(`💲 ${P[id].name}: Preis gesenkt auf ${fmt(vkOf(id))}`);
-  }
+window.upgradeProd=function(id){
+  const lvl=prodLvl(id);
+  if(lvl>=3) return;
+  if(!pay(cost(lvl===1?40:100))) return;
+  S.prodLvl[id]=lvl+1;
+  toast(`⭐ ${P[id].name}: Qualität ${"★".repeat(lvl+1)}${"☆".repeat(2-lvl)} – Kunden zahlen jetzt ${fmt(vkOf(id))}!`, true);
   renderPanel(); save();
 };
 window.setPromo=function(id){
@@ -2869,7 +3429,7 @@ window.setPromo=function(id){
 window.dropProduct=function(id){
   S.assortment=S.assortment.filter(x=>x!==id);
   delete S.lager[id];
-  delete S.priceAdj[id];
+  delete S.prodLvl[id];
   if(S.promoId===id) S.promoId=null;
   Object.keys(S.shelves).forEach(k=>{
     (S.shelves[k].parts||[]).forEach(pt=>{
@@ -3101,8 +3661,14 @@ function openShelf(id){
   const slot=slotById(id);
   const d=shelfData(id);
   const zoneName = slot.zone==="hall" ? "Halle" : DEPTS[slot.zone].emoji+" "+DEPTS[slot.zone].name;
+  const slvl=d.lvl||1, cap=shelfCap(id);
   let html=`<h2>🗄️ Regal (${zoneName})</h2>
-  <div class="sub">${d.parts.length} Produktplatz${d.parts.length>1?"̈e":""} · Regal-System Stufe ${S.shelfTier}</div>`;
+  <div class="sub">${d.parts.length} Produktplatz${d.parts.length>1?"̈e":""} · Regal-Stufe ${slvl}/5 · ${cap} Stk. pro Platz</div>`;
+  html+=`<div class="row"><div class="em">${slvl>=5?"⭐":"⬆️"}</div>
+    <div class="info"><b>Regal-Stufe ${"▮".repeat(slvl)}${"▯".repeat(5-slvl)}</b>
+    <small>${slvl<5? "Nächste Stufe: "+SHELF_CAPS[slvl]+" Stk. pro Platz – und das Regal sieht edler aus." : "Premium-Regal: 50 Stk. pro Platz."}</small></div>
+    ${slvl>=5?'<span class="tag hit">✓ max</span>':`<button class="btn" onclick="upgradeShelf('${id}')">${fmtS(cost(SHELF_UP[slvl-1]))}</button>`}
+  </div>`;
   const taken=new Set();
   Object.values(S.shelves).forEach(sh=>(sh.parts||[]).forEach(pt=>{ if(pt.prod) taken.add(pt.prod); }));
   d.parts.forEach((pt,pi)=>{
@@ -3112,9 +3678,15 @@ function openShelf(id){
       html+=`<div class="row">
         <div class="em">${p.emoji}</div>
         <div class="info"><b>${p.name}${isLiq(pt.prod)?' <span class="tag season">🏷️ −'+Math.round(S.liqPct*100)+'%</span>':''}${isPromo(pt.prod)?' <span class="tag hit">🔥 Aktion</span>':''}</b>
-        <small>${pt.units}/${shelfCap()} im Regal · ${lag} im Lager · VK ${fmt(vkEff(pt.prod))}</small></div>
-        <button class="btn sec" onclick="clearShelfPart('${id}',${pi})">✕</button>
-        <button class="btn green" onclick="refillPart('${id}',${pi})" ${lag<=0||pt.units>=shelfCap()?"disabled":""}>📦</button>
+        <small>${pt.units}/${cap} im Regal · ${lag} im Lager · VK ${fmt(vkEff(pt.prod))}</small>
+        <div style="height:6px;background:#e5e9ec;border-radius:3px;margin-top:5px;overflow:hidden">
+          <i style="display:block;height:6px;width:${Math.round(pt.units/cap*100)}%;
+             background:${pt.units===0?"#d33a2f":pt.units<cap*0.3?"#e8a13a":"#39c46e"}"></i>
+        </div></div>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          <button class="btn sec" onclick="clearShelfPart('${id}',${pi})">✕</button>
+          <button class="btn green" onclick="refillPart('${id}',${pi})" ${lag<=0||pt.units>=cap?"disabled":""}>📦 Auffüllen</button>
+        </div>
       </div>`;
     }else{
       const options=S.assortment.filter(pid=>{
@@ -3131,13 +3703,27 @@ function openShelf(id){
       }
     }
   });
-  html+=`<button class="btn sec" style="margin-top:10px" onclick="closeDialog()">Schliessen</button>`;
+  const canFill=d.parts.some(pt=>pt.prod && pt.units<cap && (S.lager[pt.prod]||0)>0);
+  html+=`<button class="btn green" onclick="refillAllParts('${id}')" ${canFill?"":"disabled"}>📦 Alle Plätze auffüllen</button>`;
+  html+=`<button class="btn sec" style="margin-top:8px" onclick="closeDialog()">Schliessen</button>`;
   showDialog(html);
 }
+window.refillAllParts=function(id){
+  let n=0;
+  const cap=shelfCap(id);
+  shelfData(id).parts.forEach(pt=>{
+    if(!pt.prod) return;
+    const add=Math.min(cap-pt.units, S.lager[pt.prod]||0);
+    pt.units+=add; S.lager[pt.prod]-=add; n+=add;
+  });
+  const slot=slotById(id);
+  if(n>0) effects.push({x:slot.x,y:slot.y-20,txt:"+"+n+" 📦",t:1.2,col:"#1f8a4d"});
+  closeDialog(); save();
+};
 window.refillPart=function(id,pi){
   const pt=shelfData(id).parts[pi];
   const lag=S.lager[pt.prod]||0;
-  const n=Math.min(shelfCap()-pt.units, lag);
+  const n=Math.min(shelfCap(id)-pt.units, lag);
   pt.units+=n; S.lager[pt.prod]-=n;
   const slot=slotById(id);
   effects.push({x:slot.x,y:slot.y-24,txt:"+"+n+" 📦",t:1.2,col:"#1f8a4d"});
@@ -3147,6 +3733,17 @@ window.assignShelfPart=function(id,pi,pid){
   const pt=shelfData(id).parts[pi];
   pt.prod=pid; pt.units=0;
   closeDialog(); openShelf(id);
+};
+window.upgradeShelf=function(id){
+  const d=shelfData(id);
+  const lvl=d.lvl||1;
+  if(lvl>=5) return;
+  if(!pay(cost(SHELF_UP[lvl-1]))) return;
+  d.lvl=lvl+1;
+  const slot=slotById(id);
+  effects.push({x:slot.x,y:slot.y-24,txt:"⬆️ Stufe "+d.lvl,t:1.4,col:"#1f8a4d"});
+  toast(`🗄️ Regal auf Stufe ${d.lvl}: jetzt ${shelfCap(id)} Stk. pro Platz!`);
+  closeDialog(); openShelf(id); save();
 };
 window.clearShelfPart=function(id,pi){
   const pt=shelfData(id).parts[pi];
@@ -3204,6 +3801,8 @@ function updateHUD(){
   $("uiClock").textContent=clockStr()+" · "+SEASON_EMOJI[season()]+" · Lv."+(S.level+1);
   $("uiClean").style.width=cleanPct()+"%";
   $("uiClean").style.background = cleanPct()>50 ? "var(--green)" : cleanPct()>25 ? "#e8a13a" : "var(--red)";
+  $("uiMood").style.width=Math.round(S.mood||85)+"%";
+  $("uiMood").style.background = S.mood>50 ? "var(--green)" : S.mood>25 ? "#e8a13a" : "var(--red)";
 }
 let last=performance.now();
 function loop(now){
