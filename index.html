@@ -1736,11 +1736,12 @@ function camCenterDoor(){
   cam.y=d.y-(stH/sc)*0.60;
   clampCam();
 }
+function DPR(){ return Math.min(devicePixelRatio||1, 2); }
 function resize(){
   const st=$("stage");
   stW=st.clientWidth; stH=st.clientHeight;
-  cv.width=Math.round(stW*devicePixelRatio);
-  cv.height=Math.round(stH*devicePixelRatio);
+  cv.width=Math.round(stW*DPR());
+  cv.height=Math.round(stH*DPR());
   cv.style.width=stW+"px"; cv.style.height=stH+"px";
   computeScale(); clampCam();
 }
@@ -1783,13 +1784,48 @@ function rr(x,y,w,h,r){
   ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r);
   ctx.closePath();
 }
+const SHADE_C=new Map();
 function shade(hex,f){
   if(typeof hex!=="string" || hex[0]!=="#") return typeof hex==="string"? hex : "#888";
+  const key=hex+"|"+f;
+  let v=SHADE_C.get(key);
+  if(v) return v;
   const n=parseInt(hex.slice(1),16);
   const r=Math.min(255,Math.round(((n>>16)&255)*f)),
         g=Math.min(255,Math.round(((n>>8)&255)*f)),
         b=Math.min(255,Math.round((n&255)*f));
-  return `rgb(${r},${g},${b})`;
+  v=`rgb(${r},${g},${b})`;
+  SHADE_C.set(key,v);
+  return v;
+}
+const VG2_C=new Map();
+function vg2glob(h,c1,c2){
+  h=Math.max(1,Math.round(h));
+  const key=h+"|"+c1+"|"+c2;
+  let g=VG2_C.get(key);
+  if(g) return g;
+  g=ctx.createLinearGradient(0,0,0,h);
+  g.addColorStop(0,c1); g.addColorStop(1,c2);
+  VG2_C.set(key,g);
+  return g;
+}
+/* Emoji-Cache: gerasterte Emojis statt teurem fillText pro Frame */
+const EM_C=new Map();
+function drawEm(txt,px,x,y){
+  const key=txt+"|"+px;
+  let c=EM_C.get(key);
+  if(!c){
+    const s=Math.ceil(px*2.6);
+    c=mkCanvas(s*2,s*2);
+    const c2=c.getContext("2d");
+    c2.font=(px*2)+"px -apple-system,sans-serif";
+    c2.textAlign="center"; c2.textBaseline="middle";
+    c2.fillText(txt, s, s);
+    c._s=s;
+    EM_C.set(key,c);
+  }
+  const s=c._s;
+  ctx.drawImage(c, x-s/2, y-s/2-px*0.55, s, s);
 }
 function box3(x,y,w,h,d,top,r){
   ctx.fillStyle=shade(top,0.62); rr(x,y+h-4,w,d+4,Math.min(r,5)); ctx.fill();
@@ -2183,8 +2219,8 @@ function render(){
   const now=performance.now()/1000;
   const dtv=Math.min(0.1, now-(VIS.last||now)); VIS.last=now;
   initTex();
-  ctx.setTransform(sc*devicePixelRatio,0,0,sc*devicePixelRatio,
-                   -cam.x*sc*devicePixelRatio, -cam.y*sc*devicePixelRatio);
+  const _dpr=DPR();
+  ctx.setTransform(sc*_dpr,0,0,sc*_dpr, -cam.x*sc*_dpr, -cam.y*sc*_dpr);
   ctx.textAlign="center";
   const WW=LY.worldW, WH=LY.worldH, T=6;
   const vwv=stW/sc, vhv=stH/sc;
@@ -2194,7 +2230,7 @@ function render(){
   function isoWorld(fn,h){ ctx.save(); if(h) ctx.translate(0,-h); ctx.transform(IX,IY,-IX,IY,0,0); fn(); ctx.restore(); }
   function faceS(x0,Y,w,h,fn){ const p=PJ(x0,Y,h); ctx.save(); ctx.transform(IX,IY,0,1,p.x,p.y); fn(w,h); ctx.restore(); }
   function faceE(X0,y0,d,h,fn){ const p=PJ(X0,y0,h); ctx.save(); ctx.transform(-IX,IY,0,1,p.x,p.y); fn(d,h); ctx.restore(); }
-  function vg2(h,c1,c2){ const g=ctx.createLinearGradient(0,0,0,h); g.addColorStop(0,c1); g.addColorStop(1,c2); return g; }
+  const vg2=vg2glob;
   function isoBox(x,y,w,d,h,cTop,cS,cE){
     faceE(x+w,y,d,h,(W,H)=>{
       if(typeof cE==="function"){ cE(W,H); return; }
@@ -2465,8 +2501,7 @@ function render(){
         D(rx+ry+24,()=>{ isoBox(rx,ry,34,14,22,"#9a7a48","#8a6a3a");
           [[9,-16],[25,-16],[25,-6],[9,-6]].forEach(([ox,oh],ii)=>{
             const q=PJ(rx+ox,ry+14,22+oh+8);
-            ctx.font="9px -apple-system,sans-serif";
-            ctx.fillText((ii+row)%3===1?"🥫":"📦", q.x, q.y);
+            drawEm((ii+row)%3===1?"🥫":"📦", 9, q.x, q.y);
           });
         });
       }
@@ -2704,7 +2739,7 @@ function render(){
   }
   odirt.forEach(dd=>{
     gshadow(dd.x-7,dd.y,14,7,0.12);
-    BB(dd.x,dd.y,()=>{ ctx.font="13px -apple-system,sans-serif"; ctx.fillText(dd.em,0,2); });
+    BB(dd.x,dd.y,()=>{ drawEm(dd.em,13,0,2); });
   });
   // Bus
   if(BUS.active){
@@ -2822,12 +2857,12 @@ function render(){
           const perR=nP===1? 4 : nP===2? 2 : 1;
           const fill=pt.units/CAP;
           const icons=Math.min(perR*2, Math.ceil(fill*perR*2));
-          ctx.font=(nP===1?"11px":"10px")+" -apple-system,sans-serif";
+          const emPx=nP===1?11:10;
           for(let ic=0;ic<icons;ic++){
             const col=ic%perR, row=Math.floor(ic/perR);
             const px2=x0+secW/2+(col-(perR-1)/2)*(secW/(perR+0.3));
             const q=PJ(px2, Y+Dp, Hh-9-row*13);
-            ctx.fillText(p.emoji, q.x, q.y);
+            drawEm(p.emoji, emPx, q.x, q.y);
           }
           // Preisschild-Billboard mit Stückzahl (Premium in Gold)
           const q2=PJ(cxm, Y+Dp, 0);
@@ -3805,11 +3840,12 @@ function updateHUD(){
   $("uiMood").style.background = S.mood>50 ? "var(--green)" : S.mood>25 ? "#e8a13a" : "var(--red)";
 }
 let last=performance.now();
+let lastRender=0, lastHud=0;
 function loop(now){
   const dt=Math.min(0.1,(now-last)/1000); last=now;
   tick(dt);
-  render();
-  updateHUD();
+  if(now-lastRender>=30){ lastRender=now; render(); }
+  if(now-lastHud>=120){ lastHud=now; updateHUD(); }
   requestAnimationFrame(loop);
 }
 
