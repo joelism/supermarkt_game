@@ -351,6 +351,7 @@ function defaultState(){
     openH:9, closeH:13,
     shopName:"",
     staffShift:{auffueller:"full", kassierer:"full", putz:"full", sicherheit:"full"},
+    shiftBy:{},
     hallShelves:3,
     shelves:{ h0:{parts:[{prod:"brot",units:15}]}, h1:{parts:[{prod:"milch",units:15}]}, h2:{parts:[{prod:"pasta",units:10}]} },
     lager:{brot:20, milch:20, pasta:15, schoggi:10},
@@ -366,7 +367,7 @@ function defaultState(){
     parking:2,
     staffRoomLvl:1, shelfTier:1, kasseTier:1, scanTier:1,
     camTier:0, gateTier:0, office:false, parkMeterTier:0,
-    mood:85, moodBy:{}, lunchPlan:{}, breaks:{}, eco:false,
+    mood:85, moodBy:{}, lunchPlan:{}, breaks:{}, eco:false, fps:30,
     stats:{},
     dayLog:{rev:0, theft:0, thefts:0, buys:0, sold:0, angry:0, inv:0, caught:0, fines:0, pfees:0},
     lifetime:{rev:0, days:0},
@@ -440,8 +441,13 @@ function load(){
         else if(o && !o.lvl) o.lvl=lv;
       });
     }
-    if(typeof S.mood!=="number") S.mood=85;
-    ["lunchPlan","breaks","moodBy"].forEach(k=>{ if(typeof S[k]!=="object"||!S[k]) S[k]={}; });
+    if((S.camTier||0)>0 || (S.gateTier||0)>0){
+    const back=(S.camTier||0)*150+(S.gateTier||0)*220;
+    S.money+=back; S.camTier=0; S.gateTier=0;
+    setTimeout(()=>toast(`♻️ Kameras & Schranken abgeschafft – ${fmtS(back)} zurückerstattet. Dafür lohnen sich gefasste Diebe jetzt richtig!`, true), 900);
+  }
+  if(typeof S.mood!=="number") S.mood=85;
+    ["lunchPlan","breaks","moodBy","shiftBy"].forEach(k=>{ if(typeof S[k]!=="object"||!S[k]) S[k]={}; });
   Object.keys(S.lunchPlan).forEach(k=>{ if(!Array.isArray(S.lunchPlan[k])) delete S.lunchPlan[k]; });
   Object.keys(S.breaks).forEach(k=>{ if(k.indexOf("_")<0) delete S.breaks[k]; });   // altes Rollen-Format
     ensureStats(); return true;
@@ -477,7 +483,7 @@ function scanTime(){ return [3.5,2.8,2.2][S.scanTier-1]||3.5; }
 function kasseRate(){ return [2.6,2.0,1.5][S.kasseTier-1]||2.6; }
 function guardAvail(){ return Math.max(0, staffOn("sicherheit") - (GUARD.busy?1:0)); }
 function theftChance(){
-  return Math.max(0.02, 0.20 - guardAvail()*0.08 - S.camTier*0.03 - S.gateTier*0.02);
+  return Math.max(0.04, 0.20 - guardAvail()*0.08);
 }
 function cleanPct(){ return Math.max(0, Math.min(100, 100 - dirt.length*6 - odirt.length*4)); }
 function staffEff(){ return (S.staffRoom<30 ? 0.5 : 1 + 0.08*(S.staffRoomLvl-1)) * (0.7 + 0.5*(S.mood||85)/100); }
@@ -494,11 +500,28 @@ const SHIFTS={
   morning:{name:"Vormittag", emoji:"🌅"},
   evening:{name:"Nachmittag", emoji:"🌆"},
 };
-function shiftRange(k){
-  const s=(S.staffShift&&S.staffShift[k])||"full";
+function shiftModeRange(s){
   if(s==="morning") return [S.openH, Math.min(13,S.closeH)];
   if(s==="evening") return [Math.max(13,S.openH), S.closeH];
   return [S.openH, S.closeH];
+}
+function shiftArr(k){
+  if(!S.shiftBy) S.shiftBy={};
+  let a=S.shiftBy[k];
+  if(!Array.isArray(a)) a=S.shiftBy[k]=[];
+  const def=(S.staffShift&&S.staffShift[k])||"full";
+  while(a.length<(S.staff[k]||0)) a.push(def);
+  if(a.length>(S.staff[k]||0)) a.length=S.staff[k]||0;
+  return a;
+}
+function empShiftRange(k,i){ return shiftModeRange(shiftArr(k)[i]||"full"); }
+function empShiftOn(k,i){ const h=dayHour(), r=empShiftRange(k,i); return h>=r[0] && h<r[1]; }
+function shiftRange(k){                        // Rollen-Hülle (frühester Start, spätestes Ende)
+  const a=shiftArr(k);
+  if(!a.length) return [S.openH, S.closeH];
+  let lo=99, hi=-1;
+  a.forEach(s=>{ const r=shiftModeRange(s); lo=Math.min(lo,r[0]); hi=Math.max(hi,r[1]); });
+  return [lo,hi];
 }
 function shiftHours(k){ const r=shiftRange(k); return Math.max(0, r[1]-r[0]); }
 const LUNCH_SLOTS=["11","12","13"];
@@ -530,7 +553,12 @@ function lunchArr(k){
   if(a.length>(S.staff[k]||0)) a.length=S.staff[k]||0;
   return a;
 }
+function empLunchSlots(k,i){
+  const r=empShiftRange(k,i);
+  return LUNCH_SLOTS.filter(s=> +s>=r[0] && +s<r[1] && r[1]-r[0]>5);   // halbe Schichten: keine Mittagspause
+}
 function empAtLunch(k,i){
+  if(!empLunchSlots(k,i).length) return false;
   const h=dayHour();
   const sl=+(lunchArr(k)[i]||"11");
   return h>=sl && h<sl+1;
@@ -549,17 +577,18 @@ function onBreak(k){
 }
 function staffOn(k){
   if(!S.staff[k]) return 0;
-  const h=dayHour(), r=shiftRange(k);
-  if(h<r[0] || h>=r[1]) return 0;
   let n=0;
-  for(let i=0;i<S.staff[k];i++) if(!empAway(k,i)) n++;
+  for(let i=0;i<S.staff[k];i++) if(empShiftOn(k,i) && !empAway(k,i)) n++;
   return n;
+}
+function empCost(k,i){
+  const r=empShiftRange(k,i);
+  return Math.round(STAFF[k].wage*Math.max(0,pricedHours(r[0],r[1]))/12);
 }
 function wagesPerDay(){
   let sum=0;
   Object.keys(STAFF).forEach(k=>{
-    const r=shiftRange(k);
-    sum += S.staff[k]*STAFF[k].wage*Math.max(0,pricedHours(r[0],r[1]))/12;
+    for(let i=0;i<(S.staff[k]||0);i++) sum+=empCost(k,i);
   });
   return Math.round(sum);
 }
@@ -610,8 +639,6 @@ function completion(){
   tot+=2;                have+=S.shelfTier-1;
   tot+=2;                have+=S.kasseTier-1;
   tot+=2;                have+=S.scanTier-1;
-  tot+=3;                have+=S.camTier;
-  tot+=2;                have+=S.gateTier;
   tot+=3;                have+=S.parkMeterTier;
   tot+=6;                have+=6*Math.min(1, S.parking/L.parkCap);
   return Math.min(1, have/tot);
@@ -1005,7 +1032,7 @@ function checkout(c,isScan){
   c.carry.forEach(it=>{ sum+=vkEff(it.prod)*it.qty; });
   if(isScan && Math.random()<theftChance()){
     c.thief=true; c.stolen=sum;
-    c.speed*=1.4*(1-0.13*S.gateTier);
+    c.speed*=1.4;
     S.dayLog.theft+=sum; S.dayLog.thefts++;
     effects.push({x:c.x,y:c.y-26,txt:"😱 DIEB! Antippen!",t:2,col:"#d33a2f"});
   }else{
@@ -1465,10 +1492,18 @@ window.showPlanner=function(){
       h+=`<div class="planTitle">☕ Mittagspause (1 Std. Pflicht) – Schichten: ${openSlots.map(s2=>s2+"–"+(+s2+1)).join(" · ")}</div>`;
       roles.forEach(r=>{
         PLAN.lunch[r].forEach((sl,i)=>{
-          if(!openSlots.includes(sl)) sl=PLAN.lunch[r][i]=openSlots[0]||"11";
+          const mySlots=empLunchSlots(r,i).filter(s2=>openSlots.includes(s2));
+          if(!mySlots.length){
+            h+=`<div class="chipRow" style="margin:2px 0 3px;align-items:center">
+              <span style="font-size:12px;width:118px;flex-shrink:0">${STAFF[r].emoji} ${empName(r,i)}</span>
+              <span class="tag">${SHIFTS[shiftArr(r)[i]||"full"].name} – keine Mittagspause nötig</span>
+            </div>`;
+            return;
+          }
+          if(!mySlots.includes(sl)) sl=PLAN.lunch[r][i]=mySlots[0];
           h+=`<div class="chipRow" style="margin:2px 0 3px;align-items:center">
-            <span style="font-size:12px;width:118px;flex-shrink:0">${STAFF[r].emoji} ${STAFF[r].name}${S.staff[r]>1?" "+(i+1):""}</span>
-            ${openSlots.map(s2=>`<button class="chip ${sl===s2?"on":""}" onclick="planLunch('${r}',${i},'${s2}')">${s2}–${+s2+1}</button>`).join("")}
+            <span style="font-size:12px;width:118px;flex-shrink:0">${STAFF[r].emoji} ${empName(r,i)}</span>
+            ${mySlots.map(s2=>`<button class="chip ${sl===s2?"on":""}" onclick="planLunch('${r}',${i},'${s2}')">${s2}–${+s2+1}</button>`).join("")}
           </div>`;
         });
       });
@@ -1541,8 +1576,11 @@ function planBreakReqs(){
   const cluster=(Math.random()<0.25 && vTo>vFrom)? vFrom+Math.random()*(vTo-vFrom) : null;
   ["kassierer","auffueller","putz","sicherheit"].forEach(r=>{
     for(let i=0;i<(S.staff[r]||0);i++){
-      if(vTo>vFrom) R.reqs.push({role:r, idx:i, at: cluster!==null? cluster : vFrom+Math.random()*(vTo-vFrom)});
-      if(S.closeH>14.6) R.reqs.push({role:r, idx:i, at: 13.2+Math.random()*(S.closeH-1-13.2)});
+      const sr=empShiftRange(r,i);
+      const f1=Math.max(vFrom,sr[0]+0.5), t1=Math.min(vTo,sr[1]-0.5);
+      if(t1>f1) R.reqs.push({role:r, idx:i, at: (cluster!==null&&cluster>f1&&cluster<t1)? cluster : f1+Math.random()*(t1-f1)});
+      const f2=Math.max(13.2,sr[0]+0.5), t2=Math.min(S.closeH-1,sr[1]-0.5);
+      if(S.closeH>14.6 && t2>f2) R.reqs.push({role:r, idx:i, at: f2+Math.random()*(t2-f2)});
     }
   });
 }
@@ -1568,8 +1606,7 @@ window.payBonus=function(k,i){
   showMoodInfo(); save();
 };
 function empStatus(k,i){
-  const h=dayHour(), r=shiftRange(k);
-  if(h<r[0]||h>=r[1]) return ["🌙 ausser Schicht","#7a8792"];
+  if(!empShiftOn(k,i)) return ["🌙 ausser Schicht","#7a8792"];
   if(empAtLunch(k,i)) return ["🍽️ Mittag","#e8a13a"];
   if(empOnPause(k,i)) return [(S.staffRoomLvl>=4?"💤":"☕")+" Pause","#5f88c9"];
   return ["🏪 im Laden","#1f8a4d"];
@@ -1587,6 +1624,8 @@ window.showMoodInfo=function(){
       const mc=m<25?"#d33a2f":m<50?"#e8a13a":"#39c46e";
       const [st,stc]=empStatus(k,i);
       const lp=+(lunchArr(k)[i]||"11");
+      const sr=empShiftRange(k,i);
+      const hasLunch=empLunchSlots(k,i).length>0;
       const b=S.breaks[k+"_"+i];
       const brSeg=(b&&b.day===S.day)?`<i class="tlSeg" style="left:${pct(b.until-0.5)}%;width:${pct(b.until)-pct(b.until-0.5)}%;background:#5f88c9"></i>`:"";
       rows+=`<div class="row" style="align-items:flex-start">
@@ -1601,12 +1640,14 @@ window.showMoodInfo=function(){
             <small style="width:34px;text-align:right;font-weight:800;color:${mc}">${m}%</small>
           </div>
           <div class="tl">
-            <i class="tlSeg" style="left:${pct(lp)}%;width:${pct(lp+1)-pct(lp)}%;background:#e8a13a"></i>
+            ${sr[0]>o?`<i class="tlSeg" style="left:0;width:${pct(sr[0])}%;background:#c3ccd3;opacity:.8"></i>`:""}
+            ${sr[1]<c?`<i class="tlSeg" style="left:${pct(sr[1])}%;width:${100-pct(sr[1])}%;background:#c3ccd3;opacity:.8"></i>`:""}
+            ${hasLunch?`<i class="tlSeg" style="left:${pct(lp)}%;width:${pct(lp+1)-pct(lp)}%;background:#e8a13a"></i>`:""}
             ${brSeg}
             <i class="tlNow" style="left:${pct(nowH)}%"></i>
           </div>
           <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--ink-soft)">
-            <span>${o}:00</span><span>Mittag ${lp}–${lp+1}</span><span>${c}:00</span>
+            <span>${o}:00</span><span>${hasLunch?`Mittag ${lp}–${lp+1}`:`Schicht ${sr[0]}–${sr[1]}`} · ${fmtS(empCost(k,i))}/Tag</span><span>${c}:00</span>
           </div>
         </div>
         <button class="btn" style="padding:7px 10px" onclick="payBonus('${k}',${i})">💵 +10</button>
@@ -1698,9 +1739,10 @@ function offerMove(){
     <div class="stat"><span>Grössere Halle</span><b>${nxt.hallSlots} Regalplätze</b></div>
     <div class="stat"><span>Mehr Kassen</span><b>${nxt.maxK}× Kasse, ${nxt.maxS}× Self-Scan</b></div>
     <div class="stat"><span>Umzugskosten</span><b class="minus">−${fmtS(LV().moveCost)}</b></div>
-    <p style="font-size:12px;color:var(--ink-soft);margin-top:8px">Personal, Sortiment und Lager ziehen mit um. Einrichtung und Anbauten baust du im neuen Laden wieder auf (Level ${S.level+2}-Preise).</p>
-    <button class="btn green" onclick="moveLevel()" ${S.money<LV().moveCost?"disabled":""}>Umziehen! 🚚</button>
+    <p style="font-size:12px;color:var(--red);margin-top:8px;font-weight:700">⚠️ Waren kommen NICHT mit! Nur Geld, Personal und deine Sortiments-Liste ziehen um – Lager- und Regalbestände verfallen.</p>
+    <p style="font-size:12px;color:var(--ink-soft)">💡 Tipp: Mach zuerst eine Total-Liquidation und versilbere alles. Du kannst aber auch direkt umziehen – dann ist die Ware einfach weg.</p>
     <button class="btn" onclick="chooseLiqMove()">🏷️ Erst Liquidation – alles muss raus!</button>
+    <button class="btn green" onclick="moveLevel()" ${S.money<LV().moveCost?"disabled":""}>Direkt umziehen (Waren verfallen) 🚚</button>
     <button class="btn sec" onclick="closeDialog();paused=false;">Später (siehe «Ausbau»)</button>
   `);
 }
@@ -1734,13 +1776,8 @@ function moveLevel(){
   customers=[]; dirt=[]; odirt=[]; effects=[]; cars=[]; resetQueues(); BUS.active=false;
   GUARD.state="post"; GUARD.busy=false; GUARD.target=null; GUARD.init=false;
   buildLayout();
-  const tops=S.assortment.filter(id=>P[id].dept==="food").slice(0,3);
-  tops.forEach((id,i)=>{
-    S.shelves["h"+i]={parts:[], lvl:1};
-    const n=Math.min(shelfCap("h"+i), S.lager[id]||0);
-    shelfData("h"+i).parts[0]={prod:id, units:n};
-    S.lager[id]=(S.lager[id]||0)-n;
-  });
+  S.lager={};                      // Waren bleiben im alten Laden zurück
+  S.shelves={};
   camCenterDoor(); save();
   const newProds=PRODUCTS.filter(p=>(p.lv||1)===S.level+1);
   const newLine=newProds.length? `<p style="font-size:12.5px">🆕 Neu im Grosshandel: ${newProds.slice(0,7).map(p=>p.emoji+" "+p.name).join(", ")}${newProds.length>7?" +"+(newProds.length-7)+" weitere":""} – findest du im Sortiment!</p>` : "";
@@ -1748,7 +1785,7 @@ function moveLevel(){
     <h2>🚚 Willkommen im ${LV().name}!</h2>
     <div class="sub">Level ${S.level+1} von 10 · alles ist grösser – bau ihn wieder auf 100% aus!</div>
     ${newLine}
-    <p style="font-size:13px;color:var(--ink-soft)">Neuer Laden, neue Chance: Sortiment behalten oder neu zusammenstellen? Beim Neustart wird das restliche Lager zu 50% des Einkaufspreises verkauft.</p>
+    <p style="font-size:13px;color:var(--ink-soft)">Die Regale sind leer – Zeit für den ersten Grosseinkauf! Sortiments-Liste behalten oder neu zusammenstellen?</p>
     <button class="btn" onclick="closeDialog();paused=false;">Sortiment behalten ✓</button>
     <button class="btn sec" onclick="resetAssortment()">🗑️ Neu wählen (zurück zum Basis-Sortiment)</button>
   `);
@@ -1936,11 +1973,21 @@ window.openSettings=function(){
     <div class="stat"><span>🏪 Laden</span><b>${S.shopName||"—"}</b></div>
     <div class="stat"><span>📈 Fortschritt</span><b>Level ${S.level+1}/10 · Tag ${S.day}</b></div>
     <div class="stat"><span>💰 Konto</span><b>${fmtS(S.money)}</b></div>
-    <button class="btn sec" onclick="toggleEco()">${S.eco?"🔋 Energiesparmodus: AN (antippen zum Ausschalten)":"🔋 Energiesparmodus einschalten"}</button>
+    <div class="secTitle" style="margin-top:10px">🎞️ Bildrate (weniger = kühler & längerer Akku)</div>
+    <div class="chipRow" style="justify-content:center">
+      ${[["30","Flüssig"],["24","Ausgewogen"],["15","Sparsam"],["10","Ultra-Spar"]].map(([f,n])=>
+        `<button class="chip ${(S.fps||30)==f?"on":""}" onclick="setFps(${f})">${n}<br><small>${f} FPS</small></button>`).join("")}
+    </div>
+    <button class="btn sec" onclick="toggleEco()">${S.eco?"🔋 Reduzierte Auflösung: AN":"🔋 Auflösung reduzieren (noch kühler)"}</button>
     <button class="btn sec" onclick="closeDialog();askName(1);">✏️ Ladenname ändern</button>
     <button class="btn danger" onclick="confirmReset()">🔒 Laden schliessen & neu beginnen</button>
     <button class="btn" onclick="closeDialog();paused=false;">Weiter spielen ▶</button>
   `);
+};
+window.setFps=function(f){
+  S.fps=f; save();
+  toast("🎞️ Bildrate: "+f+" FPS");
+  openSettings();
 };
 window.toggleEco=function(){
   S.eco=!S.eco;
@@ -2135,9 +2182,8 @@ const BW={};
 function walkerFor(k,i){ return BW[k+"_"+i]; }
 function walkerCount(k){ return Object.keys(BW).filter(x=>x.startsWith(k+"_")).length; }
 function roleOnShift(k){
-  if(!S.staff[k]) return false;
-  const h=dayHour(), r=shiftRange(k);
-  return h>=r[0] && h<r[1];
+  for(let i=0;i<(S.staff[k]||0);i++) if(empShiftOn(k,i)) return true;
+  return false;
 }
 const STAFF_LOOK={kassierer:["#2e6da4","#e8bd90","#4a3220"], auffueller:["#d08a30","#c98a5b","#1e1e1e"],
                   putz:["#5aa060","#f2c9a0","#7a4a1e"], sicherheit:["#2f3b46","#c98a5b","#1e1e1e"]};
@@ -2230,7 +2276,7 @@ function drawStaff(now,dtv){
   if(!VIS.auff.init){ VIS.auff={x:LY.aisleX-30,y:LY.hall.y+130,carry:false,init:true}; }
   if(roleOnShift("kassierer")){
     for(let i=0;i<Math.min(S.kassen,S.staff.kassierer);i++){
-      if(walkerFor("kassierer",i) || empAtLunch("kassierer",i)) continue;
+      if(!empShiftOn("kassierer",i) || walkerFor("kassierer",i) || empAtLunch("kassierer",i)) continue;
       const p=LY.kassePos[i];
       drawPerson(p.x-2,p.y-26,"#2e6da4","#e8bd90","#4a3220",{apron:"#ff9d3f", look:i%4});
     }
@@ -3214,22 +3260,6 @@ function render(){
     });
   }
   // Schranken & Kameras
-  if(S.gateTier>0){
-    [[LY.door.x-30],[LY.door.x+30]].forEach(([gx2])=>{
-      const gy3=LY.hall.y+LY.hall.h-34;
-      D(gx2+gy3+6,()=>{ isoBox(gx2-4,gy3-4,8,8,20,"#98a5ae","#8a97a0");
-        const q=PJ(gx2,gy3,24);
-        ctx.fillStyle= (S.gateTier>1 && Math.sin(now*4)>0)? "#7dffb0" : "#4a5a64";
-        ctx.beginPath(); ctx.arc(q.x,q.y,2.5,0,7); ctx.fill(); });
-    });
-  }
-  if(S.camTier>0){
-    const cams=[[LY.office.x-20,LY.office.y+4],[LY.hall.x+18,LY.hall.y+8],[LY.aisleX,LY.hall.y+LY.hall.h-14]];
-    for(let k=0;k<Math.min(S.camTier,3);k++){
-      BB(cams[k][0],cams[k][1],()=>{ ctx.font="12px -apple-system,sans-serif"; ctx.fillText("📹",0,-WALLH+6); });
-    }
-  }
-
   /* ===== PERSONEN & EFFEKTE ===== */
   if(staffOn("sicherheit")>0 && walkerCount("sicherheit")<S.staff.sicherheit && GUARD.init){
     drawPerson(GUARD.x,GUARD.y,"#2f3b46","#c98a5b","#1e1e1e",
@@ -3722,22 +3752,31 @@ function renderPersonal(){
   let html="";
   Object.keys(STAFF).forEach(k=>{
     const st=STAFF[k];
-    const r=shiftRange(k), hrs=shiftHours(k);
-    const wage=Math.round(st.wage*Math.max(0,pricedHours(r[0],r[1]))/12);
     html+=`<div class="row">
       <div class="em">${st.emoji}</div>
       <div class="info"><b>${st.name} <span class="tag">${S.staff[k]}×</span></b>
-      <small>${st.desc}</small>
-      <small>Schicht: ${String(r[0]).padStart(2,"0")}–${String(r[1]).padStart(2,"0")} Uhr (${hrs}h) · ${fmtS(wage)}/Tag pro Person</small></div>
+      <small>${st.desc} Grundlohn ${fmtS(st.wage)}/Tag (ganzer Tag).</small></div>
       <button class="btn sec" onclick="fire('${k}')" ${S.staff[k]?"":"disabled"}>−</button>
       <button class="btn" onclick="hire('${k}')">+</button>
-    </div>
-    <div class="row" style="padding-top:2px">
-      <div class="em" style="font-size:14px;color:var(--ink-soft)">⏰</div>
-      <div class="info" style="display:flex;gap:6px;flex-wrap:wrap">
-        ${Object.keys(SHIFTS).map(s=>`<button class="btn ${ (S.staffShift[k]||"full")===s?"":"sec" }" style="padding:7px 10px" onclick="setShift('${k}','${s}')">${SHIFTS[s].emoji} ${SHIFTS[s].name}</button>`).join("")}
-      </div>
     </div>`;
+    const sa=shiftArr(k), ma=moodArr(k);
+    for(let i=0;i<sa.length;i++){
+      const m=Math.round(ma[i]??80);
+      const mc=m<25?"#d33a2f":m<50?"#e8a13a":"#39c46e";
+      const r=empShiftRange(k,i);
+      html+=`<div class="row" style="padding-top:2px;padding-left:10px">
+        <div class="em" style="font-size:14px">👤</div>
+        <div class="info">
+          <b style="font-size:13px">${empName(k,i)}
+            <span class="tag" style="color:${mc}">😊 ${m}%</span>
+            <span class="tag">${String(r[0]).padStart(2,"0")}–${String(r[1]).padStart(2,"0")} Uhr</span>
+            <span class="tag">${fmtS(empCost(k,i))}/Tag</span></b>
+          <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:5px">
+            ${Object.keys(SHIFTS).map(s=>`<button class="chip ${sa[i]===s?"on":""}" style="padding:6px 10px;margin:0" onclick="setShift('${k}',${i},'${s}')">${SHIFTS[s].emoji} ${SHIFTS[s].name}</button>`).join("")}
+          </div>
+        </div>
+      </div>`;
+    }
   });
   html+=`<div class="secTitle">Tipp</div>
   <p style="font-size:12.5px;color:var(--ink-soft);padding:0 4px 8px">
@@ -3745,9 +3784,11 @@ function renderPersonal(){
   Randstunden (vor 08:00 / nach 20:00) haben 50% Zuschlag. Und halte den Personalraum sauber, sonst arbeitet das Team nur halb so schnell! 🤢</p>`;
   $("panelBody").innerHTML=html;
 }
-window.setShift=function(k,s){
-  S.staffShift[k]=s;
-  toast(`⏰ ${STAFF[k].name}: ${SHIFTS[s].name}-Schicht`);
+window.setShift=function(k,i,s){
+  shiftArr(k)[i]=s;
+  const sl=empLunchSlots(k,i);
+  if(sl.length && !sl.includes(lunchArr(k)[i])) lunchArr(k)[i]=sl[0];
+  toast(`⏰ ${empName(k,i)}: ${SHIFTS[s].name}-Schicht`);
   renderPanel(); save();
 };
 window.hire=function(k){
@@ -3756,8 +3797,13 @@ window.hire=function(k){
   renderPanel(); save();
 };
 window.fire=function(k){
-  if(S.staff[k]>0) S.staff[k]--;
-  toast(`${STAFF[k].name} entlassen`);
+  if(S.staff[k]<=0) return;
+  const i=S.staff[k]-1;
+  const nm=empName(k,i);
+  S.staff[k]--;
+  moodArr(k); shiftArr(k); lunchArr(k);        // Arrays auf neue Länge trimmen
+  delete S.breaks[k+"_"+i];
+  toast(`👋 ${nm} (${STAFF[k].name}) entlassen`);
   renderPanel(); save();
 };
 
@@ -3850,14 +3896,6 @@ function renderAusbau(){
     <div class="info"><b>Self-Scan-Tempo <span class="tag">Stufe ${S.scanTier}/3</span></b>
     <small>Scannen dauert nur noch ${scanTime()}s.</small></div>
     ${S.scanTier>=3?'<span class="tag hit">✓ max</span>':`<button class="btn" onclick="buyTier('scanTier',3,[350,900])">${fmtS(cost([350,900][S.scanTier-1]))}</button>`}</div>`;
-  html+=`<div class="row"><div class="em">📹</div>
-    <div class="info"><b>Überwachungskameras <span class="tag">Stufe ${S.camTier}/3</span></b>
-    <small>−3% Diebstahl pro Stufe. Aktuelles Risiko: ${Math.round(theftChance()*100)}%.</small></div>
-    ${S.camTier>=3?'<span class="tag hit">✓ max</span>':`<button class="btn" onclick="buyTier('camTier',3,[250,500,800],0)">${fmtS(cost([250,500,800][S.camTier]))}</button>`}</div>`;
-  html+=`<div class="row"><div class="em">🚧</div>
-    <div class="info"><b>Ausgangs-Schranken <span class="tag">Stufe ${S.gateTier}/2</span></b>
-    <small>−2% Diebstahl pro Stufe und Diebe fliehen 13% langsamer.</small></div>
-    ${S.gateTier>=2?'<span class="tag hit">✓ max</span>':`<button class="btn" onclick="buyTier('gateTier',2,[300,700],0)">${fmtS(cost([300,700][S.gateTier]))}</button>`}</div>`;
   html+=`<div class="row"><div class="em">🚔</div>
     <div class="info"><b>Diebstahlbüro</b>
     <small>Der Wachmann bringt gefasste Diebe hierher: Anzeige = CHF 100 Busse. Auch selbst gefasste Diebe zahlen die Busse!</small></div>
@@ -3907,7 +3945,7 @@ window.buyTier=function(key,max,prices,zeroBase){
   if(cur>=max) return;
   if(!pay(cost(prices[idx]))) return;
   S[key]=cur+1;
-  const names={shelfTier:"Regal-System",kasseTier:"Kassen-Tempo",scanTier:"Self-Scan-Tempo",camTier:"Kameras",gateTier:"Schranken",staffRoomLvl:"Personalraum",parkMeterTier:"Parkuhr"};
+  const names={shelfTier:"Regal-System",kasseTier:"Kassen-Tempo",scanTier:"Self-Scan-Tempo",staffRoomLvl:"Personalraum",parkMeterTier:"Parkuhr"};
   toast(`⬆️ ${names[key]||key}: Stufe ${S[key]}!`);
   if(key==="shelfTier") toast("🗄️ Alle Regale haben jetzt Platz für ein weiteres Produkt!", true);
   renderPanel(); save();
@@ -4098,7 +4136,7 @@ let lastRender=0, lastHud=0;
 function loop(now){
   const dt=Math.min(0.1,(now-last)/1000); last=now;
   tick(dt);
-  if(now-lastRender>=(paused?85:(S.eco?50:30))){ lastRender=now; render(); }
+  if(now-lastRender>=(paused?85:Math.round(1000/(S.fps||30)))){ lastRender=now; render(); }
   if(now-lastHud>=120){ lastHud=now; updateHUD(); }
   requestAnimationFrame(loop);
 }
