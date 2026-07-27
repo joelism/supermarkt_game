@@ -297,7 +297,43 @@ const PRODUCTS = [
   {id:"pflanze",    name:"Zimmerpflanze",   emoji:"🪴", dept:"nonfood", ek:4.5, vk:9.9,  pop:4},
   {id:"schirm",     name:"Regenschirm",     emoji:"☂️", dept:"nonfood", ek:4.0, vk:8.9,  pop:5, season:"Herbst"},
   {id:"campstuhl",  name:"Campingstuhl",    emoji:"🪑", dept:"nonfood", ek:7.0, vk:14.9, pop:3, season:"Sommer"},
+  /* ---- Neue Produkte: schalten sich mit den Levels frei ---- */
+  {id:"gipfeli",    name:"Gipfeli",         emoji:"🥐", dept:"food",    ek:0.7, vk:1.6,  pop:9, lv:2},
+  {id:"konfi",      name:"Konfitüre",       emoji:"🍓", dept:"food",    ek:2.2, vk:4.5,  pop:5, lv:2},
+  {id:"oel",        name:"Olivenöl",        emoji:"🫒", dept:"food",    ek:4.5, vk:8.9,  pop:4, lv:3},
+  {id:"senf",       name:"Senf & Ketchup",  emoji:"🌭", dept:"food",    ek:1.4, vk:2.9,  pop:5, lv:3},
+  {id:"energy",     name:"Energy-Drink",    emoji:"⚡", dept:"food",    ek:1.0, vk:2.6,  pop:7, lv:4},
+  {id:"sushi",      name:"Sushi-Box",       emoji:"🍣", dept:"food",    ek:6.0, vk:12.9, pop:6, lv:5},
+  {id:"bier",       name:"Bier (Sixpack)",  emoji:"🍺", dept:"food",    ek:4.5, vk:9.5,  pop:7, lv:5},
+  {id:"wein",       name:"Wein",            emoji:"🍷", dept:"food",    ek:7.0, vk:14.9, pop:5, lv:6},
+  {id:"pesto",      name:"Pesto",           emoji:"🌿", dept:"food",    ek:2.6, vk:5.2,  pop:4, lv:6},
+  {id:"lebkuchen",  name:"Lebkuchen",       emoji:"🍪", dept:"food",    ek:2.0, vk:4.4,  pop:6, lv:4, season:"Winter"},
+  {id:"melone",     name:"Wassermelone",    emoji:"🍉", dept:"gemuese", ek:2.5, vk:5.5,  pop:7, lv:2, season:"Sommer"},
+  {id:"pilze",      name:"Pilze",           emoji:"🍄", dept:"gemuese", ek:2.0, vk:4.4,  pop:5, lv:3, season:"Herbst"},
+  {id:"avocado",    name:"Avocado",         emoji:"🥑", dept:"gemuese", ek:1.8, vk:3.9,  pop:6, lv:4},
+  {id:"ananas",     name:"Ananas",          emoji:"🍍", dept:"gemuese", ek:2.5, vk:5.2,  pop:5, lv:5},
+  {id:"mango",      name:"Mango",           emoji:"🥭", dept:"gemuese", ek:2.2, vk:4.9,  pop:5, lv:6},
+  {id:"quark",      name:"Quark",           emoji:"🥛", dept:"kaese",   ek:1.0, vk:2.2,  pop:6, lv:2},
+  {id:"fetakaese",  name:"Feta",            emoji:"🧀", dept:"kaese",   ek:2.2, vk:4.5,  pop:5, lv:3},
+  {id:"parmesan",   name:"Parmesan",        emoji:"🧀", dept:"kaese",   ek:4.0, vk:7.9,  pop:5, lv:5},
+  {id:"burrata",    name:"Burrata",         emoji:"🫓", dept:"kaese",   ek:3.5, vk:7.5,  pop:5, lv:7},
+  {id:"truten",     name:"Trutenschnitzel", emoji:"🍗", dept:"fleisch", ek:4.5, vk:8.9,  pop:5, lv:3},
+  {id:"forelle",    name:"Forelle",         emoji:"🐟", dept:"fleisch", ek:5.5, vk:10.9, pop:4, lv:5},
+  {id:"kalb",       name:"Kalbsgeschnetzeltes", emoji:"🥩", dept:"fleisch", ek:9.5, vk:18.9, pop:4, lv:7},
+  {id:"wagyu",      name:"Wagyu-Steak",     emoji:"🥩", dept:"fleisch", ek:25, vk:49.9, pop:3, lv:9},
+  {id:"shampoo",    name:"Shampoo",         emoji:"🧴", dept:"nonfood", ek:2.5, vk:5.2,  pop:6, lv:2},
+  {id:"handtuch",   name:"Frottée-Tücher",  emoji:"🧺", dept:"nonfood", ek:5.0, vk:10.9, pop:4, lv:4},
+  {id:"kopfhoerer", name:"Kopfhörer",       emoji:"🎧", dept:"nonfood", ek:12,  vk:24.9, pop:4, lv:6},
+  {id:"kaffeemaschine", name:"Kaffeemaschine", emoji:"☕", dept:"nonfood", ek:35, vk:69.9, pop:3, lv:8},
 ];
+/* Bestehende Produkte auf Freischalt-Level verteilen (Basis bleibt Level 1) */
+const PLV={kaffee:2, muesli:2, guetzli:2, honig:3, tee:3, zopf:3, popcorn:3, sirup:4, fondue:4, pizza:2,
+  peperoni:2, brokkoli:3, zitronen:3, trauben:4, kuerbis:4,
+  emmentaler:2, tilsiter:3, brie:4, rahm:2, raclette:3, vacherin:6,
+  hack:2, entrecote:5, salami:2, lachs:4, crevetten:6, fondchin:6,
+  pfanne:3, waschmittel:2, spielzeug:3, batterien:2, kerzen:2, blumen:2, buch:4, pflanze:4, campstuhl:5, sonnenbrille:3, grillkohle:3};
+PRODUCTS.forEach(p=>{ if(!p.lv) p.lv=PLV[p.id]||1; });
+function prodUnlocked(p){ return (p.lv||1)<=S.level+1; }
 const P = {}; PRODUCTS.forEach(p=>P[p.id]=p);
 
 const STAFF = {
@@ -330,7 +366,7 @@ function defaultState(){
     parking:2,
     staffRoomLvl:1, shelfTier:1, kasseTier:1, scanTier:1,
     camTier:0, gateTier:0, office:false, parkMeterTier:0,
-    mood:85, moodBy:{}, lunchPlan:{}, breaks:{},
+    mood:85, moodBy:{}, lunchPlan:{}, breaks:{}, eco:false,
     stats:{},
     dayLog:{rev:0, theft:0, thefts:0, buys:0, sold:0, angry:0, inv:0, caught:0, fines:0, pfees:0},
     lifetime:{rev:0, days:0},
@@ -1706,9 +1742,12 @@ function moveLevel(){
     S.lager[id]=(S.lager[id]||0)-n;
   });
   camCenterDoor(); save();
+  const newProds=PRODUCTS.filter(p=>(p.lv||1)===S.level+1);
+  const newLine=newProds.length? `<p style="font-size:12.5px">🆕 Neu im Grosshandel: ${newProds.slice(0,7).map(p=>p.emoji+" "+p.name).join(", ")}${newProds.length>7?" +"+(newProds.length-7)+" weitere":""} – findest du im Sortiment!</p>` : "";
   showDialog(`
     <h2>🚚 Willkommen im ${LV().name}!</h2>
     <div class="sub">Level ${S.level+1} von 10 · alles ist grösser – bau ihn wieder auf 100% aus!</div>
+    ${newLine}
     <p style="font-size:13px;color:var(--ink-soft)">Neuer Laden, neue Chance: Sortiment behalten oder neu zusammenstellen? Beim Neustart wird das restliche Lager zu 50% des Einkaufspreises verkauft.</p>
     <button class="btn" onclick="closeDialog();paused=false;">Sortiment behalten ✓</button>
     <button class="btn sec" onclick="resetAssortment()">🗑️ Neu wählen (zurück zum Basis-Sortiment)</button>
@@ -1874,7 +1913,7 @@ function camCenterDoor(){
   cam.y=d.y-(stH/sc)*0.60;
   clampCam();
 }
-function DPR(){ return Math.min(devicePixelRatio||1, 2); }
+function DPR(){ return Math.min(devicePixelRatio||1, (typeof S!=="undefined"&&S&&S.eco)?1.5:2); }
 function resize(){
   const st=$("stage");
   stW=st.clientWidth; stH=st.clientHeight;
@@ -1897,10 +1936,17 @@ window.openSettings=function(){
     <div class="stat"><span>🏪 Laden</span><b>${S.shopName||"—"}</b></div>
     <div class="stat"><span>📈 Fortschritt</span><b>Level ${S.level+1}/10 · Tag ${S.day}</b></div>
     <div class="stat"><span>💰 Konto</span><b>${fmtS(S.money)}</b></div>
+    <button class="btn sec" onclick="toggleEco()">${S.eco?"🔋 Energiesparmodus: AN (antippen zum Ausschalten)":"🔋 Energiesparmodus einschalten"}</button>
     <button class="btn sec" onclick="closeDialog();askName(1);">✏️ Ladenname ändern</button>
     <button class="btn danger" onclick="confirmReset()">🔒 Laden schliessen & neu beginnen</button>
     <button class="btn" onclick="closeDialog();paused=false;">Weiter spielen ▶</button>
   `);
+};
+window.toggleEco=function(){
+  S.eco=!S.eco;
+  save(); resize(); SPRC.clear();
+  toast(S.eco? "🔋 Energiesparmodus AN – weniger Akku & Hitze" : "⚡ Volle Grafikleistung");
+  openSettings();
 };
 window.confirmReset=function(){
   showDialog(`
@@ -1990,8 +2036,21 @@ function LBB(x,y,fn){ LBLIST.push(()=>{ const p=PJ(x,y); ctx.save(); ctx.transla
 function drawPerson(x,y,shirt,skin,hair,o){
   D(x+y+0.6, ()=>{ const p=PJ(x,y); drawPersonScreen(p.x,p.y,shirt,skin,hair,o); });
 }
+const VGS_W=new WeakMap();
+function vgSpan(y0,y1,c1,c2){
+  let m=VGS_W.get(ctx);
+  if(!m){ m=new Map(); VGS_W.set(ctx,m); }
+  const key=y0+"|"+y1+"|"+c1+"|"+c2;
+  let g=m.get(key);
+  if(g) return g;
+  g=ctx.createLinearGradient(0,y0,0,y1);
+  g.addColorStop(0,c1); g.addColorStop(1,c2);
+  m.set(key,g);
+  return g;
+}
 function drawPersonScreen(x,y,shirt,skin,hair,o){
   o=o||{};
+  ctx.save(); ctx.translate(x,y); x=0; y=0;
   const look=o.look||0;
   ctx.fillStyle="rgba(0,0,0,.16)";
   ctx.beginPath(); ctx.ellipse(x,y+9,8,3.5,0,0,7); ctx.fill();
@@ -2006,9 +2065,8 @@ function drawPersonScreen(x,y,shirt,skin,hair,o){
   ctx.beginPath(); ctx.ellipse(x-3+lp,y+9,2.6,1.6,0,0,7); ctx.fill();
   ctx.beginPath(); ctx.ellipse(x+3-lp,y+9,2.6,1.6,0,0,7); ctx.fill();
   // Körper
-  const bgr=ctx.createLinearGradient(0,y-8,0,y+7);
-  bgr.addColorStop(0, shade(shirt,1.12)); bgr.addColorStop(1, shade(shirt,0.70));
-  ctx.fillStyle=bgr; rr(x-7,y-8+bob*.3,14,15,6); ctx.fill();
+  ctx.fillStyle=vgSpan(-8,7, shade(shirt,1.12), shade(shirt,0.70));
+  rr(x-7,y-8+bob*.3,14,15,6); ctx.fill();
   ctx.strokeStyle="rgba(20,25,32,.45)"; ctx.lineWidth=1.4;
   rr(x-7,y-8+bob*.3,14,15,6); ctx.stroke();
   ctx.fillStyle="rgba(255,255,255,.25)"; rr(x-6,y-7.5+bob*.3,5,4,2); ctx.fill();
@@ -2026,9 +2084,8 @@ function drawPersonScreen(x,y,shirt,skin,hair,o){
     ctx.beginPath(); ctx.moveTo(x-6,y-7+bob*.3); ctx.lineTo(x+6,y+2+bob*.3); ctx.stroke(); }
   // Kopf
   const hy=y-13+bob*.5;
-  const hgr=ctx.createLinearGradient(0,hy-7,0,hy+7);
-  hgr.addColorStop(0, shade(skin,1.06)); hgr.addColorStop(1, shade(skin,0.82));
-  ctx.fillStyle=hgr; ctx.beginPath(); ctx.arc(x,hy,6.8,0,7); ctx.fill();
+  ctx.fillStyle=vgSpan(-20,-6, shade(skin,1.06), shade(skin,0.82));
+  ctx.beginPath(); ctx.arc(x,hy,6.8,0,7); ctx.fill();
   ctx.strokeStyle="rgba(20,25,32,.4)"; ctx.lineWidth=1.3;
   ctx.beginPath(); ctx.arc(x,hy,6.8,0,7); ctx.stroke();
   // Frisur-Varianten
@@ -2063,6 +2120,7 @@ function drawPersonScreen(x,y,shirt,skin,hair,o){
   ctx.beginPath(); ctx.arc(x+3.8,hy+2.2,1.2,0,7); ctx.fill();
   ctx.fillStyle="rgba(255,255,255,.35)";
   ctx.beginPath(); ctx.arc(x-2.2,hy-2.8,1.7,0,7); ctx.fill();
+  ctx.restore();
 }
 const VIS={ putz:{x:0,y:0,init:false}, auff:{x:0,y:0,carry:false,init:false}, last:0 };
 function moveVis(p,tx,ty,speed,dtv){
@@ -2161,7 +2219,7 @@ function drawBreakWalkers(now,dtv){
       drawPerson(w.x,w.y,lk[0],lk[1],lk[2],{phase:moving?now*9+i:undefined, look:i%4});
       if(w.ph==="sit"){
         const sp=seatPos(w.kind,w.seat);
-        BB(w.x,w.y,()=>{ ctx.font="10px -apple-system,sans-serif"; ctx.fillText(sp.badge, 10, -16); });
+        BB(w.x,w.y,()=>{ drawEm(sp.badge, 10, 10, -16); });
       }
     }
   });
@@ -2183,7 +2241,7 @@ function drawStaff(now,dtv){
     if(tgt){ moving=!moveVis(VIS.putz,tgt.x,tgt.y-8,46,dtv); }
     else{ moving=!moveVis(VIS.putz,LY.aisleX+40,LY.hall.y+130,32,dtv); }
     drawPerson(VIS.putz.x,VIS.putz.y,"#5aa060","#f2c9a0","#7a4a1e",{apron:"#d9e2e8",phase:moving?now*9:undefined});
-    BB(VIS.putz.x+9,VIS.putz.y,()=>{ ctx.font="11px -apple-system,sans-serif"; ctx.textAlign="center"; ctx.fillText("🧹",0,2); });
+    BB(VIS.putz.x+9,VIS.putz.y,()=>{ drawEm("🧹",11,0,2); });
   }
   if(staffOn("auffueller")>0 && walkerCount("auffueller")<S.staff.auffueller){
     let bestS=null, worst=1;
@@ -2202,7 +2260,7 @@ function drawStaff(now,dtv){
       else{ moving=!moveVis(VIS.auff,home.x,home.y,50,dtv); if(!moving) VIS.auff.carry=true; }
     }else{ moving=!moveVis(VIS.auff,home.x,home.y,40,dtv); }
     drawPerson(VIS.auff.x,VIS.auff.y,"#d08a30","#c98a5b","#1e1e1e",{apron:"#eef1f3",phase:moving?now*9:undefined});
-    if(VIS.auff.carry){ BB(VIS.auff.x+10,VIS.auff.y,()=>{ ctx.font="11px -apple-system,sans-serif"; ctx.fillText("📦",0,-4); }); }
+    if(VIS.auff.carry){ BB(VIS.auff.x+10,VIS.auff.y,()=>{ drawEm("📦",11,0,-4); }); }
   }
 }
 
@@ -3176,16 +3234,14 @@ function render(){
   if(staffOn("sicherheit")>0 && walkerCount("sicherheit")<S.staff.sicherheit && GUARD.init){
     drawPerson(GUARD.x,GUARD.y,"#2f3b46","#c98a5b","#1e1e1e",
       {hat:"#2f3b46",vest:"#ffd23f",phase: GUARD.state!=="post"? now*10 : undefined});
-    BB(GUARD.x,GUARD.y,()=>{ ctx.font="9px -apple-system,sans-serif";
-      ctx.fillText(GUARD.state==="chase"?"❗":"👀",0,-30); });
+    BB(GUARD.x,GUARD.y,()=>{ drawEm(GUARD.state==="chase"?"❗":"👀",9,0,-30); });
   }
   drawStaff(now,dtv);
   customers.forEach(c=>{
     drawPerson(c.x,c.y, c.thief?"#d33a2f":c.shirt, c.skin, c.hair,
       {phase: c.path.length? now*9+(c.po||0) : undefined, look: Math.abs(Math.floor((c.po||0)*7))%4});
     if(c.carry.length){
-      BB(c.x,c.y,()=>{ ctx.font="10px -apple-system,sans-serif";
-        ctx.fillText(P[c.carry[c.carry.length-1].prod].emoji, 10, -2); });
+      BB(c.x,c.y,()=>{ drawEm(P[c.carry[c.carry.length-1].prod].emoji, 10, 10, -2); });
     }
     if(c.state==="scanning" && c.pod!=null){
       const w2=26, pr=Math.min(1,c.scanT/scanTime());
@@ -3224,7 +3280,7 @@ function render(){
   DRLIST.length=0;
 
   /* ===== LICHT & NACHT ===== */
-  {
+  if(!S.eco){
     const vgd=ctx.createRadialGradient(cam.x+vwv*0.35, cam.y+vhv*0.25, 60,
                                       cam.x+vwv*0.5, cam.y+vhv*0.55, Math.max(vwv,vhv)*0.85);
     vgd.addColorStop(0,"rgba(255,250,225,.07)");
@@ -3523,18 +3579,27 @@ window.splitInvoice=function(id){
 /* ---- Einkauf ---- */
 function renderEinkauf(){
   $("panelTitle").textContent="📦 Wareneinkauf";
-  $("panelSub").textContent="Ware kommt direkt ins Lager";
+  $("panelSub").textContent="Ware kommt direkt ins Lager · nach Abteilung, viel Lager oben";
   let html="";
-  S.assortment.forEach(id=>{
-    const p=P[id];
-    const inSeason=p.season && p.season===season();
-    html+=`<div class="row">
-      <div class="em">${p.emoji}</div>
-      <div class="info"><b>${p.name}${inSeason?'<span class="tag season">Saison!</span>':''}</b>
-      <small>Lager: ${S.lager[id]||0} Stk. · EK ${fmt(p.ek)} → VK ${fmt(vkOf(id))}</small></div>
-      <button class="btn sec" onclick="buyStock('${id}',10)">+10<br><small>${fmtS(p.ek*10)}</small></button>
-      <button class="btn" onclick="buyStock('${id}',25)">+25<br><small>${fmtS(p.ek*25)}</small></button>
-    </div>`;
+  Object.keys(DEPTS).forEach(dk=>{
+    const ids=S.assortment.filter(id=>P[id].dept===dk);
+    if(!ids.length) return;
+    ids.sort((a,b)=>(S.lager[b]||0)-(S.lager[a]||0));   // wenig Lager zuunterst
+    const tot=ids.reduce((s2,id)=>s2+(S.lager[id]||0),0);
+    html+=`<div class='secTitle'>${DEPTS[dk].emoji} ${DEPTS[dk].name} <span class="tag">${tot} Stk. im Lager</span></div>`;
+    ids.forEach(id=>{
+      const p=P[id];
+      const lag=S.lager[id]||0;
+      const inSeason=p.season && p.season===season();
+      const lagCol= lag===0? "var(--red)" : lag<10? "#e8a13a" : "var(--ink-soft)";
+      html+=`<div class="row">
+        <div class="em">${p.emoji}</div>
+        <div class="info"><b>${p.name}${inSeason?'<span class="tag season">Saison!</span>':''}</b>
+        <small><b style="color:${lagCol}">Lager: ${lag} Stk.</b> · EK ${fmt(p.ek)} → VK ${fmt(vkOf(id))}</small></div>
+        <button class="btn sec" onclick="buyStock('${id}',10)">+10<br><small>${fmtS(p.ek*10)}</small></button>
+        <button class="btn" onclick="buyStock('${id}',25)">+25<br><small>${fmtS(p.ek*25)}</small></button>
+      </div>`;
+    });
   });
   $("panelBody").innerHTML=html || "<p style='padding:20px;text-align:center;color:var(--ink-soft)'>Kein Sortiment – füge unter «Sortiment» Produkte hinzu.</p>";
 }
@@ -3598,12 +3663,15 @@ function renderSortiment(){
   Object.keys(DEPTS).forEach(dk=>{
     const avail=PRODUCTS.filter(p=>p.dept===dk && !S.assortment.includes(p.id));
     if(!avail.length) return;
-    const unlocked=S.depts.includes(dk);
-    html+=`<div class='secTitle'>${DEPTS[dk].emoji} ${DEPTS[dk].name} ${unlocked?"":"🔒 (Abteilung nicht gebaut)"}</div>`;
+    const deptOk=S.depts.includes(dk);
+    avail.sort((a,b)=> (prodUnlocked(a)?0:1)-(prodUnlocked(b)?0:1) || (a.lv||1)-(b.lv||1));
+    html+=`<div class='secTitle'>${DEPTS[dk].emoji} ${DEPTS[dk].name} ${deptOk?"":"🔒 (Abteilung nicht gebaut)"}</div>`;
     avail.forEach(p=>{
+      const lvOk=prodUnlocked(p);
+      const unlocked=deptOk && lvOk;
       html+=`<div class="row" style="${unlocked?"":"opacity:.45"}">
         <div class="em">${p.emoji}</div>
-        <div class="info"><b>${p.name}${p.season?`<span class="tag ${p.season===season()?'season':''}">${SEASON_EMOJI[p.season]} ${p.season}</span>`:""}</b>
+        <div class="info"><b>${p.name}${p.season?`<span class="tag ${p.season===season()?'season':''}">${SEASON_EMOJI[p.season]} ${p.season}</span>`:""}${lvOk?"":`<span class="tag">🔒 ab Level ${p.lv}</span>`}</b>
         <small>EK ${fmt(p.ek)} → VK ${fmt(p.vk)}</small></div>
         ${unlocked
           ? `<button class="btn green" onclick="addProduct('${p.id}')">Aufnehmen</button>`
@@ -4030,7 +4098,7 @@ let lastRender=0, lastHud=0;
 function loop(now){
   const dt=Math.min(0.1,(now-last)/1000); last=now;
   tick(dt);
-  if(now-lastRender>=(paused?85:30)){ lastRender=now; render(); }
+  if(now-lastRender>=(paused?85:(S.eco?50:30))){ lastRender=now; render(); }
   if(now-lastHud>=120){ lastHud=now; updateHUD(); }
   requestAnimationFrame(loop);
 }
