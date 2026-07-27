@@ -34,6 +34,18 @@ body{
 #topbar .clock{font-size:11.5px;color:#b9c6cf}
 #topbar .clean{font-size:12px;text-align:right;line-height:1.2}
 .cleanbar{width:64px;height:6px;background:#3b4b58;border-radius:3px;overflow:hidden;margin-top:3px;margin-left:auto}
+#tutBox{position:absolute;top:56px;left:10px;right:10px;z-index:26;background:rgba(24,32,40,.96);
+  color:#fff;border-radius:14px;padding:11px 13px;box-shadow:0 6px 18px rgba(0,0,0,.35);
+  border:1.5px solid rgba(255,157,63,.6);animation:tutIn .35s ease}
+#tutText{font-size:13.5px;font-weight:700;line-height:1.45}
+#tutDots{display:flex;gap:4px;margin-top:7px}
+#tutDots i{width:7px;height:7px;border-radius:4px;background:#4a5764}
+#tutDots i.on{background:#ff9d3f}
+#tutSkip{position:absolute;top:7px;right:9px;background:none;border:0;color:#9fb0be;font-family:inherit;
+  font-size:10.5px;font-weight:700;cursor:pointer;padding:4px}
+@keyframes tutIn{from{transform:translateY(-10px);opacity:0}to{transform:none;opacity:1}}
+.tutPulse{animation:navGlow 1s ease infinite !important;border-radius:12px}
+@keyframes navGlow{0%,100%{box-shadow:0 0 0 0 rgba(255,157,63,0)}50%{box-shadow:0 0 0 5px rgba(255,157,63,.55)}}
 #moneyFx{position:absolute;top:52px;left:10px;z-index:30;pointer-events:none;display:flex;flex-direction:column;gap:3px;align-items:flex-start}
 .mfx{background:rgba(22,30,38,.88);padding:2.5px 9px;border-radius:9px;font-size:11px;font-weight:800;
   animation:mfxUp 1.6s ease forwards;box-shadow:0 2px 8px rgba(0,0,0,.25)}
@@ -163,6 +175,11 @@ canvas{display:block;touch-action:none;position:absolute;left:50%;top:50%;transf
   <button id="zoomBtn">🗺️</button>
   <button id="setBtn">⚙️</button>
   <div id="reqBox"></div>
+<div id="tutBox" style="display:none">
+  <div id="tutText"></div>
+  <div id="tutDots"></div>
+  <button id="tutSkip" onclick="tutSkip()">Tour beenden ✕</button>
+</div>
 <div id="panHint">👆 Wischen zum Umsehen · 🤏 Zwei Finger zum Zoomen</div>
 </div>
 
@@ -367,7 +384,7 @@ function defaultState(){
     parking:2,
     staffRoomLvl:1, shelfTier:1, kasseTier:1, scanTier:1,
     camTier:0, gateTier:0, office:false, parkMeterTier:0,
-    mood:85, moodBy:{}, lunchPlan:{}, breaks:{}, eco:false, fps:30,
+    mood:85, moodBy:{}, lunchPlan:{}, breaks:{}, eco:false, fps:30, tutStep:0,
     stats:{},
     dayLog:{rev:0, theft:0, thefts:0, buys:0, sold:0, angry:0, inv:0, caught:0, fines:0, pfees:0},
     lifetime:{rev:0, days:0},
@@ -483,6 +500,12 @@ function scanTime(){ return [3.5,2.8,2.2][S.scanTier-1]||3.5; }
 function kasseRate(){ return [2.6,2.0,1.5][S.kasseTier-1]||2.6; }
 function guardAvail(){ return Math.max(0, staffOn("sicherheit") - (GUARD.busy?1:0)); }
 function theftChance(){
+  const hired=(S.staff.sicherheit||0)>0;
+  if(hired && staffOn("sicherheit")===0){
+    let inBreak=false;
+    for(let i=0;i<S.staff.sicherheit;i++) if(empAway("sicherheit",i)) inBreak=true;
+    if(inBreak) return 0.30;                 // Wachmann in der Pause: die Diebe wissen es!
+  }
   return Math.max(0.04, 0.20 - guardAvail()*0.08);
 }
 function cleanPct(){ return Math.max(0, Math.min(100, 100 - dirt.length*6 - odirt.length*4)); }
@@ -1038,6 +1061,7 @@ function checkout(c,isScan){
   }else{
     S.money+=sum; S.dayLog.rev+=sum; S.lifetime.rev+=sum;
     c.carry.forEach(it=>{ S.stats[it.prod].today+=it.qty; S.stats[it.prod].total+=it.qty; S.dayLog.sold+=it.qty; });
+    if(S.tutStep===5) tutNext(6);
     effects.push({x:c.x,y:c.y-26,txt:"+"+fmt(sum),t:1.4,col:"#1f8a4d"});
   }
   removeFromQueue(c);
@@ -1785,12 +1809,20 @@ function moveLevel(){
     <h2>🚚 Willkommen im ${LV().name}!</h2>
     <div class="sub">Level ${S.level+1} von 10 · alles ist grösser – bau ihn wieder auf 100% aus!</div>
     ${newLine}
-    <p style="font-size:13px;color:var(--ink-soft)">Die Regale sind leer – Zeit für den ersten Grosseinkauf! Sortiments-Liste behalten oder neu zusammenstellen?</p>
-    <button class="btn" onclick="closeDialog();paused=false;">Sortiment behalten ✓</button>
-    <button class="btn sec" onclick="resetAssortment()">🗑️ Neu wählen (zurück zum Basis-Sortiment)</button>
+    <p style="font-size:13px;color:var(--ink-soft)">Die Regale sind leer – Zeit für den ersten Grosseinkauf! Willst du deine Sortiments-Liste behalten oder am neuen Standort von Grund auf neu aufbauen?</p>
+    <button class="btn" onclick="closeDialog();paused=false;">Sortiments-Liste behalten ✓</button>
+    <button class="btn sec" onclick="clearAssortment()">🗑️ Von Grund auf neu (Sortiment leeren)</button>
   `);
 }
 window.moveLevel=moveLevel;
+window.clearAssortment=function(){
+  S.assortment=[];
+  S.prodLvl={}; S.promoId=null; S.liqSet={}; S.liqAll=false;
+  S.stats={}; ensureStats();
+  closeDialog(); paused=false; save();
+  openPanel("sortiment");
+  toast("🧺 Frischer Start: Stell dir im Sortiment dein neues Angebot zusammen!", true);
+};
 window.resetAssortment=function(){
   const keep=["brot","milch","pasta","schoggi"];
   let refund=0;
@@ -1960,6 +1992,7 @@ function resize(){
   computeScale(); clampCam();
 }
 window.addEventListener("resize",resize);
+setTimeout(()=>{ try{ renderTut(); }catch(e){} }, 300);
 document.addEventListener("visibilitychange",()=>{
   if(document.hidden){ save(); }
   else{ last=performance.now(); }
@@ -3352,6 +3385,27 @@ function render(){
     if(S.billboard) glow(LY.billboard.x, LY.billboard.y, 60, `rgba(255,200,120,${dark*0.45})`);
     if(S.busstop) glow(LY.busStop.x, LY.busStop.y, 46, `rgba(200,225,255,${dark*0.4})`);
   }
+  /* Tour-Markierungen */
+  if(S.tutStep===1){
+    const s0=LY.slots.find(s2=>s2.id==="h0");
+    if(s0) LBLIST.push(()=>{
+      const q=PJ(s0.x, s0.y, 20);
+      const pu=0.6+0.4*Math.sin(now*4);
+      ctx.strokeStyle=`rgba(255,157,63,${pu})`; ctx.lineWidth=3.5;
+      ctx.beginPath(); ctx.ellipse(q.x,q.y+14,58,30,0,0,7); ctx.stroke();
+      ctx.font="26px -apple-system,sans-serif";
+      ctx.fillText("👇", q.x, q.y-30-6*Math.sin(now*3));
+    });
+  }
+  if(S.tutStep===5 && LY.kassePos[0]){
+    const kp=LY.kassePos[0];
+    LBLIST.push(()=>{
+      const q=PJ(kp.x, kp.y, 12);
+      const pu=0.6+0.4*Math.sin(now*4);
+      ctx.strokeStyle=`rgba(255,157,63,${pu})`; ctx.lineWidth=3.5;
+      ctx.beginPath(); ctx.ellipse(q.x,q.y+8,50,28,0,0,7); ctx.stroke();
+    });
+  }
   /* ===== LABEL-EBENE (immer zuoberst, nichts verschmilzt) ===== */
   LBLIST.forEach(f=>f());
   LBLIST.length=0;
@@ -3519,12 +3573,15 @@ function handleTap(x,y){
 
 /* ================= PANELS & DIALOGE ================= */
 function showDialog(html){ $("dialogBox").innerHTML=html; $("dialogWrap").classList.add("show"); }
-function closeDialog(){ $("dialogWrap").classList.remove("show"); }
+function closeDialog(){
+  if(S.tutStep===4 && !TUT_HOLD){ tutNext(5); R.spawn=Math.min(R.spawn,0.8); } $("dialogWrap").classList.remove("show"); }
 window.closeDialog=closeDialog;
 window.startNextDay=startNextDay;
 
 let currentPanel=null;
 function openPanel(name){
+  if(S.tutStep===6 && name==="einkauf") tutNext(7);
+  else if(S.tutStep===7 && name==="personal") tutNext(8);
   currentPanel=name;
   document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("active", b.dataset.panel===name));
   if(name==="laden"){ closePanel(); return; }
@@ -3971,6 +4028,7 @@ window.buyReno=function(){ if(!S.reno && pay(cost(500))){ S.reno=true; toast("�
 
 /* ---- Regal-Popup ---- */
 function openShelf(id){
+  if(S.tutStep===1) tutNext(2);
   const slot=slotById(id);
   const d=shelfData(id);
   const zoneName = slot.zone==="hall" ? "Halle" : DEPTS[slot.zone].emoji+" "+DEPTS[slot.zone].name;
@@ -4027,6 +4085,7 @@ function openShelf(id){
   showDialog(html);
 }
 window.refillAllParts=function(id){
+  if(S.tutStep===3) tutNext(4);
   let n=0;
   const cap=shelfCap(id);
   shelfData(id).parts.forEach(pt=>{
@@ -4036,9 +4095,12 @@ window.refillAllParts=function(id){
   });
   const slot=slotById(id);
   if(n>0) effects.push({x:slot.x,y:slot.y-20,txt:"+"+n+" 📦",t:1.2,col:"#1f8a4d"});
-  closeDialog(); save();
+  save();
+  TUT_HOLD=true; closeDialog(); openShelf(id); TUT_HOLD=false;   // Popup bleibt offen, frische Balken
 };
 window.refillPart=function(id,pi){
+  if(S.tutStep===3) tutNext(4);
+  TUT_HOLD=true; setTimeout(()=>{TUT_HOLD=false;},0);
   const pt=shelfData(id).parts[pi];
   const lag=S.lager[pt.prod]||0;
   const n=Math.min(shelfCap(id)-pt.units, lag);
@@ -4048,6 +4110,7 @@ window.refillPart=function(id,pi){
   closeDialog(); save();
 };
 window.assignShelfPart=function(id,pi,pid){
+  if(S.tutStep===2) tutNext(3);
   const pt=shelfData(id).parts[pi];
   pt.prod=pid; pt.units=0;
   closeDialog(); openShelf(id);
@@ -4189,7 +4252,55 @@ window.skipTutorial=function(){
   closeDialog(); S.tutorialDone=true; paused=false; save();
   toast("Viel Erfolg, Chef! 💪");
 };
-function tutorial(){ tutorialStep(1); }
+function tutorial(){ startTour(); }
+/* ===== Interaktive Tour: der Spieler tippt selbst ===== */
+const TUT=[
+  "",
+  "🗄️ <b>Willkommen, Chef!</b> Tippe auf das golden leuchtende <b>Regal</b> in deiner Halle.",
+  "🥖 Wähle für einen <b>Produktplatz</b> ein Produkt aus – die kleine Zahl zeigt, wie viel du davon im Lager hast.",
+  "📦 Sehr gut! Tippe jetzt auf <b>«Alle Plätze auffüllen»</b> – die Ware wandert vom Lager ins Regal.",
+  "✅ Schliesse das Fenster mit <b>«Schliessen»</b> – gleich trudelt deine erste Kundschaft ein!",
+  "🧾 Kundschaft bezahlt an der <b>Kasse</b>. Ohne Kassierer kassierst du selbst: Warte, bis jemand ansteht, und tippe die Kasse mit <b>«👆 TIPPEN!»</b> an.",
+  "🛒 Erster Umsatz – stark! Nachschub kaufst du unten im Tab <b>«Einkauf»</b>. Öffne ihn.",
+  "🧑‍💼 Im Tab <b>«Personal»</b> stellst du später dein Team ein: Kassierer, Auffüller, Putzkraft … Wirf kurz einen Blick hinein.",
+  "🎉 <b>Das war die Tour!</b> Ausbau, Tagesplanung, Team-Laune und mehr entdeckst du unterwegs. Viel Erfolg, Chef!",
+];
+let TUT_HOLD=false;
+function startTour(){
+  S.tutStep=1; S.tutorialDone=false;
+  closeDialog(); paused=false;
+  renderTut(); save();
+}
+function renderTut(){
+  const box=$("tutBox");
+  if(!box) return;
+  const st=S.tutStep||0;
+  if(st<=0){ box.style.display="none"; navPulse(null); return; }
+  box.style.display="block";
+  $("tutText").innerHTML=TUT[st]||"";
+  $("tutDots").innerHTML=TUT.slice(1).map((_,i)=>`<i class="${i<st?"on":""}"></i>`).join("");
+  navPulse(st===6?"einkauf": st===7?"personal": null);
+}
+function navPulse(panel){
+  document.querySelectorAll("#nav button").forEach(b=>{
+    b.classList.toggle("tutPulse", !!panel && b.dataset.panel===panel);
+  });
+}
+function tutNext(n){
+  if((S.tutStep||0)<=0) return;
+  S.tutStep=n;
+  if(n>=8){
+    S.tutorialDone=true;
+    renderTut();
+    setTimeout(()=>{ if(S.tutStep>=8){ S.tutStep=0; renderTut(); save(); } }, 7000);
+  }else renderTut();
+  save();
+}
+window.tutSkip=function(){
+  S.tutStep=0; S.tutorialDone=true;
+  renderTut(); save();
+  toast("Viel Erfolg, Chef! 💪");
+};
 function boot(){
   const hadSave=load();
   ensureStats();
